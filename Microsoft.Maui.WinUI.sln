@@ -36,6 +36,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Maui.Controls.Sample.WinUI"
 EndProject
 Project("{C7167F0D-BC9F-4E6E-AFE1-012C56B48DB5}") = "Maui.Controls.Sample.WinUI (Package)", "src\Controls\samples\Controls.Sample.WinUI (Package)\Maui.Controls.Sample.WinUI (Package).wapproj", "{503B7824-7376-450B-9EF7-EA587DF2C8BE}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BlazorWebView", "BlazorWebView", "{437D574C-FB97-4967-B521-8B8E66E93F69}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Microsoft.AspNetCore.Components.WebView.Maui", "src\BlazorWebView\src\Microsoft.AspNetCore.Components.WebView.Maui\Microsoft.AspNetCore.Components.WebView.Maui.csproj", "{0F52573B-3F52-4064-9DBA-B601FB14F559}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -200,6 +204,22 @@ Global
 		{503B7824-7376-450B-9EF7-EA587DF2C8BE}.Release|x86.ActiveCfg = Release|x86
 		{503B7824-7376-450B-9EF7-EA587DF2C8BE}.Release|x86.Build.0 = Release|x86
 		{503B7824-7376-450B-9EF7-EA587DF2C8BE}.Release|x86.Deploy.0 = Release|x86
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|arm64.Build.0 = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|x64.Build.0 = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Debug|x86.Build.0 = Debug|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|arm64.ActiveCfg = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|arm64.Build.0 = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|x64.ActiveCfg = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|x64.Build.0 = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|x86.ActiveCfg = Release|Any CPU
+		{0F52573B-3F52-4064-9DBA-B601FB14F559}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -215,6 +235,7 @@ Global
 		{CC3D4667-D94E-4276-9311-6439BFD075E4} = {459BF674-83CB-46F6-881F-A2D2117DBF4D}
 		{B82F17CF-3D08-4D07-BF86-DF48D89E0B53} = {E1082E26-D700-4127-9329-66D673FD2D55}
 		{503B7824-7376-450B-9EF7-EA587DF2C8BE} = {E1082E26-D700-4127-9329-66D673FD2D55}
+		{0F52573B-3F52-4064-9DBA-B601FB14F559} = {437D574C-FB97-4967-B521-8B8E66E93F69}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0B8ABEAD-D2B5-4370-A187-62B5ABE4EE50}
