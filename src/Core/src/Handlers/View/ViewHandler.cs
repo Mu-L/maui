@@ -20,6 +20,7 @@ namespace Microsoft.Maui.Handlers
 		public static PropertyMapper<IView> ViewMapper = new PropertyMapper<IView>
 		{
 			[nameof(IView.BackgroundColor)] = MapBackgroundColor,
+			[nameof(IView.ClipShape)] = MapClipShape,
 			[nameof(IView.Frame)] = MapFrame,
 			[nameof(IView.IsEnabled)] = MapIsEnabled,
 			[nameof(IView.AutomationId)] = MapAutomationId
@@ -38,6 +39,11 @@ namespace Microsoft.Maui.Handlers
 		public static void MapBackgroundColor(IViewHandler handler, IView view)
 		{
 			(handler.NativeView as NativeView)?.UpdateBackgroundColor(view);
+		}
+
+		public static void MapClipShape(IViewHandler handler, IView view)
+		{
+			(handler.NativeView as NativeView)?.UpdateClipShape(view);
 		}
 
 		public static void MapAutomationId(IViewHandler handler, IView view)

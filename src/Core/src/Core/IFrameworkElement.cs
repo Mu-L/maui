@@ -1,4 +1,5 @@
-﻿using Microsoft.Maui.Primitives;
+﻿using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Primitives;
 
 namespace Microsoft.Maui
 {
@@ -41,6 +42,11 @@ namespace Microsoft.Maui
 		/// Gets the Parent of the Element.
 		/// </summary>
 		IFrameworkElement? Parent { get; }
+
+		/// <summary>
+		/// Gets the shape used to define the outline of the contents of a View.
+		/// </summary>
+		IShape ClipShape { get; }
 
 		/// <summary>
 		/// Positions child elements and determines a size for an Element.

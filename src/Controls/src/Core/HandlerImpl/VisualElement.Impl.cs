@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿using System.Runtime.CompilerServices;
 using Microsoft.Maui.Layouts;
 
 namespace Microsoft.Maui.Controls
@@ -29,6 +26,8 @@ namespace Microsoft.Maui.Controls
 		}
 
 		IFrameworkElement IFrameworkElement.Parent => Parent as IView;
+
+		Graphics.IShape IFrameworkElement.ClipShape { get; }
 
 		public Size DesiredSize { get; protected set; }
 

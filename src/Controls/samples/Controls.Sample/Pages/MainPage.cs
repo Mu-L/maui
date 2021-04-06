@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Essentials;
+using Microsoft.Maui.Graphics;
 using Microsoft.Maui.LifecycleEvents;
 using Debug = System.Diagnostics.Debug;
 
@@ -234,7 +235,7 @@ namespace Maui.Controls.Sample.Pages
 			Content = verticalStack;
 		}
 
-		public IView View { get => (IView)Content; set => Content = (View)value; }
+		public IView View { get => Content; set => Content = (View)value; }
 
 		IView CreateSampleGrid()
 		{
