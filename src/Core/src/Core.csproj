@@ -13,5 +13,6 @@
 		<PackageReference Include="Microsoft.Extensions.Configuration" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="JonLipsky.System.Graphics" Version="0.1.36" />
 	</ItemGroup>
 </Project>
