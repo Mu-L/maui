@@ -40,9 +40,6 @@ namespace Microsoft.Maui.Handlers
 
 		public static void MapClipShape(IViewHandler handler, IView view)
 		{
-			if (view.ClipShape != null)
-				handler.HasContainer = true;
-
 			if (handler.ContainerView != null)
 				handler.ContainerView.ClipShape = view.ClipShape;
 		}

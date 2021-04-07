@@ -120,7 +120,6 @@ namespace Maui.Controls.Sample.Pages
 			verticalStack.Add(new Editor { Text = "Lorem ipsum dolor sit amet", FontSize = 10, FontFamily = "dokdo_regular" });
 			verticalStack.Add(new Editor { Text = "ReadOnly Editor", IsReadOnly = true });
 
-
 			var entry = new Entry();
 			entry.TextChanged += (sender, e) =>
 			{
@@ -148,7 +147,6 @@ namespace Maui.Controls.Sample.Pages
 			var placeholderSearchBar = new SearchBar();
 			placeholderSearchBar.Placeholder = "Placeholder";
 			verticalStack.Add(placeholderSearchBar);
-
 
 			var monkeyList = new List<string>
 			{
@@ -185,12 +183,19 @@ namespace Maui.Controls.Sample.Pages
 
 			verticalStack.Add(new Image() { Source = "dotnet_bot.png" });
 
+			verticalStack.Add(new Button
+			{
+				BackgroundColor = Color.Red,
+				Padding = new Thickness(40),
+				Text = "Clip",
+				ClipShape = new Path("M15.997986,0L19.777008,11.620999 32,11.620999 22.109009,18.807002 25.888,30.432 15.997986,23.245997 6.1109924,30.432 9.8840027,18.807002 0,11.620999 12.222992,11.620999z")
+			});
+
 			Content = new ScrollView
 			{
 				Content = verticalStack
 			};
 		}
-
 
 		void SetupCompatibilityLayout()
 		{

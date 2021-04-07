@@ -41,7 +41,7 @@ namespace Microsoft.Maui.Handlers
 
 		protected TVirtualView? VirtualView { get; private set; }
 
-		public NativeView? View => TypedNativeView;
+		public NativeView? View => HasContainer ? ContainerView : TypedNativeView;
 
 		public object? NativeView => TypedNativeView;
 

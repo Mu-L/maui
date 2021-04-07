@@ -1,11 +1,13 @@
 ﻿using System.Runtime.CompilerServices;
+using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
 
 namespace Microsoft.Maui.Controls
 {
 	public partial class VisualElement : IFrameworkElement
 	{
-		private IViewHandler _handler;
+		IViewHandler _handler;
+		IShape _clipShape;
 
 		public Rectangle Frame => Bounds;
 
@@ -19,15 +21,25 @@ namespace Microsoft.Maui.Controls
 			}
 		}
 
+		public IShape ClipShape
+		{
+			get => _clipShape;
+			set
+			{
+				_clipShape = value;
+
+				if (Handler != null)
+					Handler.HasContainer = _clipShape != null;
+			}
+		}
+
 		protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
 		{
 			base.OnPropertyChanged(propertyName);
-			(Handler)?.UpdateValue(propertyName);
+			Handler?.UpdateValue(propertyName);
 		}
 
 		IFrameworkElement IFrameworkElement.Parent => Parent as IView;
-
-		Graphics.IShape IFrameworkElement.ClipShape { get; }
 
 		public Size DesiredSize { get; protected set; }
 
@@ -51,6 +63,7 @@ namespace Microsoft.Maui.Controls
 		{
 			if (IsArrangeValid)
 				return;
+
 			IsArrangeValid = true;
 
 			var newRect = this.ComputeFrame(bounds);
