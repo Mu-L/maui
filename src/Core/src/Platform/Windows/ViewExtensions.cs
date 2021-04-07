@@ -12,6 +12,8 @@ namespace Microsoft.Maui
 		public static void UpdateBackgroundColor(this FrameworkElement nativeView, IView view) =>
 			(nativeView as Control)?.UpdateBackgroundColor(view.BackgroundColor);
 
+		public static void UpdateClipShape(this FrameworkElement nativeView, IView view) { }
+
 		public static void UpdateAutomationId(this FrameworkElement nativeView, IView view) =>
 			AutomationProperties.SetAutomationId(nativeView, view.AutomationId);
 	}

@@ -5,14 +5,12 @@ namespace Microsoft.Maui
 {
 	public static class ViewExtensions
 	{
-		const string ClipShapeLayer = "ClipShapeLayer";
-
 		public static UIColor? GetBackgroundColor(this UIView view)
 			=> view?.BackgroundColor;
 
 		public static void UpdateIsEnabled(this UIView nativeView, IView view)
 		{
-			if (!(nativeView is UIControl uiControl))
+			if (nativeView is not UIControl uiControl)
 				return;
 
 			uiControl.Enabled = view.IsEnabled;
@@ -27,6 +25,11 @@ namespace Microsoft.Maui
 
 			if (!color.IsDefault)
 				nativeView.BackgroundColor = color.ToNative();
+		}
+
+		public static void UpdateClipShape(this ContainerView nativeView, IView view)
+		{
+			nativeView.ClipShape = view.ClipShape;
 		}
 
 		public static void UpdateAutomationId(this UIView nativeView, IView view) =>

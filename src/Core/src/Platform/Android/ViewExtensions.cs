@@ -20,6 +20,11 @@ namespace Microsoft.Maui
 				nativeView?.SetBackgroundColor(backgroundColor.ToNative());
 		}
 
+		public static void UpdateClipShape(this ContainerView nativeView, IView view)
+		{
+			nativeView.ClipShape = view.ClipShape;
+		}
+
 		public static bool GetClipToOutline(this AView view)
 		{
 			return view.ClipToOutline;
