@@ -6,7 +6,7 @@ namespace Microsoft.Maui.Graphics
 	{
 		public Rectangle()
 		{
-			Stretch = Stretch.Fill;
+			
 		}
 
 		public Rectangle(CornerRadius cornerRadius) : this()

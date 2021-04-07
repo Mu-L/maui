@@ -35,6 +35,8 @@ namespace Microsoft.Maui.Handlers
 
 		protected abstract TNativeView CreateNativeView();
 
+		public ContainerView? ContainerView { get; private set; }
+
 		protected TNativeView? TypedNativeView { get; private set; }
 
 		protected TVirtualView? VirtualView { get; private set; }
@@ -46,6 +48,23 @@ namespace Microsoft.Maui.Handlers
 		public IServiceProvider? Services => MauiContext?.Services;
 
 		public IMauiContext? MauiContext { get; private set; }
+
+		public bool HasContainer
+		{
+			get => _hasContainer;
+			set
+			{
+				if (_hasContainer == value)
+					return;
+
+				_hasContainer = value;
+
+				if (value)
+					SetupContainer();
+				else
+					RemoveContainer();
+			}
+		}
 
 		public void SetMauiContext(IMauiContext mauiContext) => MauiContext = mauiContext;
 
@@ -120,22 +139,5 @@ namespace Microsoft.Maui.Handlers
 			=> _mapper?.UpdateProperty(this, VirtualView, property);
 
 		protected virtual void SetupDefaults(TNativeView nativeView) { }
-
-		public bool HasContainer
-		{
-			get => _hasContainer;
-			set
-			{
-				if (_hasContainer == value)
-					return;
-
-				_hasContainer = value;
-
-				if (value)
-					SetupContainer();
-				else
-					RemoveContainer();
-			}
-		}
 	}
 }

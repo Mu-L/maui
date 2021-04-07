@@ -1,6 +1,5 @@
 using Android.Content;
 using Android.Views;
-using Microsoft.Maui;
 
 namespace Microsoft.Maui.Handlers
 {
@@ -86,7 +85,8 @@ namespace Microsoft.Maui.Handlers
 
 		void SetupContainer()
 		{
-
+			ContainerView ??= new ContainerView(Context);
+			ContainerView.MainView = TypedNativeView;
 		}
 
 		void RemoveContainer()

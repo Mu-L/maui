@@ -6,7 +6,7 @@ namespace Microsoft.Maui.Graphics
 	{
 		public Ellipse()
 		{
-			Stretch = Stretch.Fill;
+		
 		}
 
 		public override PathF CreatePath(RectangleF rect, float density = 1)
