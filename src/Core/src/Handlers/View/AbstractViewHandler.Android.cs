@@ -85,7 +85,7 @@ namespace Microsoft.Maui.Handlers
 
 		void SetupContainer()
 		{
-			ContainerView ??= new ContainerView(Context);
+			ContainerView ??= new ContainerView(Context!);
 			ContainerView.MainView = TypedNativeView;
 		}
 

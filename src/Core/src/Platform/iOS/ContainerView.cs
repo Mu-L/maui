@@ -1,5 +1,4 @@
-﻿using System;
-using System.Graphics;
+﻿using System.Graphics;
 using System.Graphics.CoreGraphics;
 using CoreAnimation;
 using CoreGraphics;
@@ -10,12 +9,12 @@ namespace Microsoft.Maui
 	public partial class ContainerView : UIView
 	{
 		UIView? _mainView;
-		Size lastMaskSize;
+		SizeF _lastMaskSize;
 
 		public ContainerView()
 		{
 			AutosizesSubviews = true;
-			lastMaskSize = Size.Zero;
+			_lastMaskSize = SizeF.Zero;
 		}
 
 		public UIView? MainView
@@ -34,7 +33,7 @@ namespace Microsoft.Maui
 				if (_mainView == null)
 					return;
 
-				this.Frame = _mainView.Frame;
+				Frame = _mainView.Frame;
 				var oldParent = _mainView.Superview;
 
 				if (oldParent != null)
@@ -53,7 +52,7 @@ namespace Microsoft.Maui
 				return;
 
 			MainView.SizeToFit();
-			this.Bounds = MainView.Bounds;
+			Bounds = MainView.Bounds;
 
 			base.SizeToFit();
 		}
@@ -61,12 +60,16 @@ namespace Microsoft.Maui
 		CAShapeLayer? Mask
 		{
 			get => MainView?.Layer.Mask as CAShapeLayer;
-			set => MainView.Layer.Mask = value;
+			set
+			{
+				if (MainView != null)
+					MainView.Layer.Mask = value;
+			}
 		}
 
 		partial void ClipShapeChanged()
 		{
-			lastMaskSize = Size.Zero;
+			_lastMaskSize = SizeF.Zero;
 
 			if (Frame == CGRect.Empty)
 				return;
@@ -87,12 +90,12 @@ namespace Microsoft.Maui
 
 			mask ??= Mask = new CAShapeLayer();
 			var frame = Frame;
-			var bounds = new RectangleF(0, 0, frame.Width, frame.Height);
+			var bounds = new RectangleF(0, 0, (float)frame.Width, (float)frame.Height);
 
-			if (bounds.Size == lastMaskSize)
+			if (bounds.Size == _lastMaskSize)
 				return;
 
-			lastMaskSize = bounds.Size;
+			_lastMaskSize = bounds.Size;
 			var path = _clipShape?.CreatePath(bounds);
 			mask.Path = path?.AsCGPath();
 		}

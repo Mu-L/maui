@@ -1,5 +1,4 @@
-﻿using System;
-using Android.Content;
+﻿using Android.Content;
 using Android.Views;
 using Android.Widget;
 using Android.Graphics;
@@ -12,12 +11,12 @@ namespace Microsoft.Maui
 	public partial class ContainerView : FrameLayout
 	{
 		View? _mainView;
-		APath? currentPath;
-		Size lastPathSize;
+		APath? _currentPath;
+		SizeF _lastPathSize;
 
-		public ContainerView(Context? context) : base(context)
+		public ContainerView(Context context) : base(context)
 		{
-			this.LayoutParameters = new LayoutParams(LayoutParams.WrapContent, LayoutParams.WrapContent);
+			LayoutParameters = new LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
 		}
 
 		public View? MainView
@@ -32,12 +31,10 @@ namespace Microsoft.Maui
 					RemoveView(_mainView);
 				
 				_mainView = value;
-				var parent = _mainView?.Parent as ViewGroup;
-				var index = parent?.IndexOfChild(_mainView);
 
 				if (_mainView != null)
 				{
-					_mainView.LayoutParameters = new ViewGroup.LayoutParams(LayoutParams.WrapContent, LayoutParams.WrapContent);
+					_mainView.LayoutParameters = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
 					AddView(_mainView);
 				}
 			}
@@ -48,14 +45,14 @@ namespace Microsoft.Maui
 			if (canvas != null && ClipShape != null)
 			{
 				var bounds = new RectangleF(0, 0, canvas.Width, canvas.Height);
-				if (lastPathSize != bounds.Size || currentPath == null)
+				if (_lastPathSize != bounds.Size || _currentPath == null)
 				{
 					var path = ClipShape.CreatePath(bounds);
-					currentPath = path.AsAndroidPath();
-					lastPathSize = bounds.Size;
+					_currentPath = path.AsAndroidPath();
+					_lastPathSize = bounds.Size;
 				}
 
-				canvas.ClipPath(currentPath);
+				canvas.ClipPath(_currentPath);
 			}
 
 			base.DispatchDraw(canvas);
@@ -68,7 +65,7 @@ namespace Microsoft.Maui
 
 			_mainView.Measure(widthMeasureSpec, heightMeasureSpec);
 			base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
-			this.SetMeasuredDimension(_mainView.MeasuredWidth, _mainView.MeasuredHeight);
+			SetMeasuredDimension(_mainView.MeasuredWidth, _mainView.MeasuredHeight);
 		}
 	}
 }
