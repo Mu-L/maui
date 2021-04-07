@@ -6,8 +6,6 @@ namespace Microsoft.Maui
 
 		public static void UpdateBackgroundColor(this object nativeView, IView view) { }
 
-		public static void UpdateClipShape(this object nativeView, IView view) { }
-
 		public static void UpdateAutomationId(this object nativeView, IView view) { }
 	}
 }

@@ -1,6 +1,3 @@
-using System;
-using System.Drawing;
-using System.Runtime.CompilerServices;
 #if __IOS__
 using NativeView = UIKit.UIView;
 #elif __MACOS__
@@ -43,13 +40,16 @@ namespace Microsoft.Maui.Handlers
 
 		public static void MapClipShape(IViewHandler handler, IView view)
 		{
-			(handler.NativeView as NativeView)?.UpdateClipShape(view);
+			if (view.ClipShape != null)
+				handler.HasContainer = true;
+
+			if (handler.ContainerView != null)
+				handler.ContainerView.ClipShape = view.ClipShape;
 		}
 
 		public static void MapAutomationId(IViewHandler handler, IView view)
 		{
 			(handler.NativeView as NativeView)?.UpdateAutomationId(view);
 		}
-
 	}
 }

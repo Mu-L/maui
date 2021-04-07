@@ -46,7 +46,7 @@ namespace Microsoft.Maui
 		/// <summary>
 		/// Gets the shape used to define the outline of the contents of a View.
 		/// </summary>
-		IShape ClipShape { get; }
+		IShape? ClipShape { get; }
 
 		/// <summary>
 		/// Positions child elements and determines a size for an Element.
