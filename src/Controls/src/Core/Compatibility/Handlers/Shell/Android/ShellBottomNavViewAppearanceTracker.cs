@@ -24,7 +24,8 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 		static ColorStateList _defaultListDark;
 
 		bool _disposed;
-		ColorStateList _colorStateList;
+		ColorStateList _itemTextColor;
+		ColorStateList _itemIconTint;
 
 		public ShellBottomNavViewAppearanceTracker(IShellContext shellContext, ShellItem shellItem)
 		{
@@ -48,21 +49,32 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 		{
 			IShellAppearanceElement controller = appearance;
 			var backgroundColor = controller.EffectiveTabBarBackgroundColor;
-			var foregroundColor = controller.EffectiveTabBarForegroundColor; // currently unused
+			var foregroundColor = controller.EffectiveTabBarForegroundColor;
 			var disabledColor = controller.EffectiveTabBarDisabledColor;
 			var unselectedColor = controller.EffectiveTabBarUnselectedColor;
 			var titleColor = controller.EffectiveTabBarTitleColor;
 
-			_colorStateList = MakeColorStateList(titleColor, disabledColor, unselectedColor);
-			bottomView.ItemTextColor = _colorStateList;
-			bottomView.ItemIconTintList = _colorStateList;
+			_itemTextColor = MakeColorStateList(
+				titleColor ?? foregroundColor,
+				disabledColor,
+				unselectedColor);
+
+			_itemIconTint = MakeColorStateList(
+				foregroundColor ?? titleColor,
+				disabledColor,
+				unselectedColor);
+
+			bottomView.ItemTextColor = _itemTextColor;
+			bottomView.ItemIconTintList = _itemIconTint;
 
 			SetBackgroundColor(bottomView, backgroundColor);
 		}
 
 		protected virtual void SetBackgroundColor(BottomNavigationView bottomView, Color color)
 		{
+#pragma warning disable XAOBS001 // Obsolete
 			var menuView = bottomView.GetChildAt(0) as BottomNavigationMenuView;
+#pragma warning restore XAOBS001 // Obsolete
 			var oldBackground = bottomView.Background;
 			var colorDrawable = oldBackground as ColorDrawable;
 			var colorChangeRevealDrawable = oldBackground as ColorChangeRevealDrawable;
@@ -86,7 +98,9 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 					backgroundColor.FillColor = ColorStateList.ValueOf(newColor);
 					backgroundColor.InitializeElevationOverlay(bottomView.Context);
 
+#pragma warning disable CS0618 // Obsolete
 					ViewCompat.SetBackground(bottomView, backgroundColor);
+#pragma warning restore CS0618 // Obsolete
 				}
 			}
 			else
@@ -104,7 +118,9 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 				var touchPoint = new Point(child.Left + (child.Right - child.Left) / 2, child.Top + (child.Bottom - child.Top) / 2);
 
+#pragma warning disable CS0618 // Obsolete
 				ViewCompat.SetBackground(bottomView, new ColorChangeRevealDrawable(lastColor, newColor, touchPoint));
+#pragma warning restore CS0618 // Obsolete
 			}
 		}
 
@@ -162,11 +178,13 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 
 			if (disposing)
 			{
-				_colorStateList?.Dispose();
+				_itemTextColor?.Dispose();
+				_itemIconTint?.Dispose();
 
+				_itemIconTint = null;
 				_shellItem = null;
 				_shellContext = null;
-				_colorStateList = null;
+				_itemTextColor = null;
 			}
 		}
 

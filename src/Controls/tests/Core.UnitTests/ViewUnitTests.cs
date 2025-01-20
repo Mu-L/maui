@@ -1,31 +1,19 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Devices;
 using Microsoft.Maui.Graphics;
-using Microsoft.Maui.Handlers;
-using NSubstitute;
 using Xunit;
 
 namespace Microsoft.Maui.Controls.Core.UnitTests
 {
-
 	public class ViewUnitTests : BaseTestFixture
 	{
 		MockDeviceInfo mockDeviceInfo;
 
-
 		public ViewUnitTests()
 		{
-
 			DeviceInfo.SetCurrent(mockDeviceInfo = new MockDeviceInfo());
-			MockPlatformSizeService.Current.GetPlatformSizeFunc = (ve, widthConstraint, heightConstraint) =>
-			{
-				if (widthConstraint < 30)
-					return new SizeRequest(new Size(40, 50));
-				return new SizeRequest(new Size(20, 100));
-			};
 		}
 
 		[Fact]
@@ -56,7 +44,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 			Assert.True(fired);
 
-			var result = view.Measure(double.PositiveInfinity, double.PositiveInfinity).Request;
+			var result = view.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None).Request;
 			Assert.Equal(new Size(200, 300), result);
 		}
 
@@ -231,46 +219,6 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		}
 
 		[Fact]
-		public void TestDoubleSetParent()
-		{
-			var view = new ParentSignalView();
-			var parent = new NaiveLayout { Children = { view } };
-
-			view.ParentSet = false;
-			view.Parent = parent;
-
-			Assert.False(view.ParentSet, "OnParentSet should not be called in the event the parent is already properly set");
-		}
-
-		[Fact]
-		public void TestAncestorAdded()
-		{
-			var child = new NaiveLayout();
-			var view = new NaiveLayout { Children = { child } };
-
-			bool added = false;
-			view.DescendantAdded += (sender, arg) => added = true;
-
-			child.Children.Add(new View());
-
-			Assert.True(added, "AncestorAdded must fire when adding a child to an ancestor of a view.");
-		}
-
-		[Fact]
-		public void TestAncestorRemoved()
-		{
-			var ancestor = new View();
-			var child = new NaiveLayout { Children = { ancestor } };
-			var view = new NaiveLayout { Children = { child } };
-
-			bool removed = false;
-			view.DescendantRemoved += (sender, arg) => removed = true;
-
-			child.Children.Remove(ancestor);
-			Assert.True(removed, "AncestorRemoved must fire when removing a child from an ancestor of a view.");
-		}
-
-		[Fact]
 		public void TestOnIdiomDefault()
 		{
 			mockDeviceInfo.Idiom = DeviceIdiom.Tablet;
@@ -360,22 +308,6 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.False(view.IsPlatformEnabled);
 		}
 
-		[Fact]
-		public void TestBindingContextChaining()
-		{
-			View child;
-			var group = new NaiveLayout
-			{
-				Children = { (child = new View()) }
-			};
-
-			var context = new object();
-			group.BindingContext = context;
-
-			Assert.Equal(context, child.BindingContext);
-		}
-
-
 
 		[Fact]
 		public void FocusWithoutSubscriber()
@@ -397,7 +329,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		public void DoNotSignalWhenAlreadyFocused()
 		{
 			var view = new View();
-			view.SetValueCore(VisualElement.IsFocusedPropertyKey, true);
+			view.SetValue(VisualElement.IsFocusedPropertyKey, true, specificity: SetterSpecificity.FromHandler);
 			bool signaled = false;
 			view.FocusChangeRequested += (sender, args) => signaled = true;
 
@@ -409,7 +341,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		public void UnFocus()
 		{
 			var view = new View();
-			view.SetValueCore(VisualElement.IsFocusedPropertyKey, true);
+			view.SetValue(VisualElement.IsFocusedPropertyKey, true, specificity: SetterSpecificity.FromHandler);
 
 			var requested = false;
 			view.FocusChangeRequested += (sender, args) =>
@@ -426,7 +358,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		public void UnFocusDoesNotFireWhenNotFocused()
 		{
 			var view = new View();
-			view.SetValueCore(VisualElement.IsFocusedPropertyKey, false);
+			view.SetValue(VisualElement.IsFocusedPropertyKey, false, specificity: SetterSpecificity.FromHandler);
 
 			var requested = false;
 			view.FocusChangeRequested += (sender, args) =>
@@ -446,7 +378,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 			bool fired = false;
 			view.Focused += (sender, args) => fired = true;
-			view.SetValueCore(VisualElement.IsFocusedPropertyKey, true);
+			view.SetValue(VisualElement.IsFocusedPropertyKey, true, specificity: SetterSpecificity.FromHandler);
 
 
 			Assert.True(fired);
@@ -456,11 +388,11 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		public void TestUnFocusedEvent()
 		{
 			var view = new View();
-			view.SetValueCore(VisualElement.IsFocusedPropertyKey, true);
+			view.SetValue(VisualElement.IsFocusedPropertyKey, true, specificity: SetterSpecificity.FromHandler);
 
 			bool fired = false;
 			view.Unfocused += (sender, args) => fired = true;
-			view.SetValueCore(VisualElement.IsFocusedPropertyKey, false);
+			view.SetValue(VisualElement.IsFocusedPropertyKey, false, specificity: SetterSpecificity.FromHandler);
 
 			Assert.True(fired);
 		}
@@ -511,7 +443,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			view.WidthRequest = 200;
 			view.MinimumWidthRequest = 100;
 
-			var result = view.Measure(double.PositiveInfinity, double.PositiveInfinity);
+			var result = view.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None);
 			Assert.Equal(new Size(200, 20), result.Request);
 			Assert.Equal(new Size(100, 20), result.Minimum);
 		}
@@ -528,7 +460,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			view.WidthRequest = 20;
 			view.MinimumHeightRequest = 100;
 
-			var result = view.Measure(double.PositiveInfinity, double.PositiveInfinity);
+			var result = view.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None);
 			Assert.Equal(new Size(20, 200), result.Request);
 			Assert.Equal(new Size(20, 100), result.Minimum);
 		}
@@ -538,7 +470,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		{
 			var task = new TaskCompletionSource<bool>();
 
-			Task.Factory.StartNew(() => Device.StartTimer(TimeSpan.FromMilliseconds(200), () =>
+			_ = Task.Factory.StartNew(() => Device.StartTimer(TimeSpan.FromMilliseconds(200), () =>
 			{
 				task.SetResult(false);
 				return false;
@@ -554,32 +486,20 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var task = new TaskCompletionSource<int>();
 
 			int steps = 0;
-			Task.Factory.StartNew(() => Device.StartTimer(TimeSpan.FromMilliseconds(200), () =>
+			_ = Task.Factory.StartNew(() => Device.StartTimer(TimeSpan.FromMilliseconds(200), () =>
 			{
 				steps++;
 				if (steps < 2)
+				{
 					return true;
+				}
+
 				task.SetResult(steps);
 				return false;
 			}));
 
 			await task.Task;
 			Assert.Equal(2, task.Task.Result);
-		}
-
-		[Fact]
-		public void BindingsApplyAfterViewAddedToParentWithContextSet()
-		{
-			var parent = new NaiveLayout();
-			parent.BindingContext = new MockViewModel { Text = "test" };
-
-			var child = new Entry();
-			child.SetBinding(Entry.TextProperty, new Binding("Text"));
-
-			parent.Children.Add(child);
-
-			Assert.Same(child.BindingContext, parent.BindingContext);
-			Assert.Equal("test", child.Text);
 		}
 
 		[Fact]
@@ -604,7 +524,9 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 					args.PropertyName == View.YProperty.PropertyName ||
 					args.PropertyName == View.WidthProperty.PropertyName ||
 					args.PropertyName == View.HeightProperty.PropertyName)
+				{
 					changed = true;
+				}
 			};
 
 			view.SizeChanged += (sender, args) => changed = true;
@@ -657,10 +579,11 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void WidthRequestEffectsGetSizeRequest()
 		{
-			var view = new View();
-			view.IsPlatformEnabled = true;
-			view.WidthRequest = 20;
-			var request = view.Measure(double.PositiveInfinity, double.PositiveInfinity);
+			static SizeRequest GetPlatformSize(VisualElement _, double w, double h) =>
+				w < 30 ? new(new(40, 50)) : new(new(20, 100));
+
+			var view = MockPlatformSizeService.Sub<View>(GetPlatformSize, width: 20);
+			var request = view.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None);
 
 			Assert.Equal(new Size(20, 50), request.Request);
 		}
@@ -668,17 +591,11 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void HeightRequestEffectsGetSizeRequest()
 		{
-			MockPlatformSizeService.Current.GetPlatformSizeFunc = (ve, widthConstraint, heightConstraint) =>
-			{
-				if (heightConstraint < 30)
-					return new SizeRequest(new Size(40, 50));
-				return new SizeRequest(new Size(20, 100));
-			};
+			static SizeRequest GetPlatformSize(VisualElement _, double w, double h) =>
+				h < 30 ? new(new(40, 50)) : new(new(20, 100));
 
-			var view = new View();
-			view.IsPlatformEnabled = true;
-			view.HeightRequest = 20;
-			var request = view.Measure(double.PositiveInfinity, double.PositiveInfinity);
+			var view = MockPlatformSizeService.Sub<View>(GetPlatformSize, height: 20);
+			var request = view.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None);
 
 			Assert.Equal(new Size(40, 20), request.Request);
 		}

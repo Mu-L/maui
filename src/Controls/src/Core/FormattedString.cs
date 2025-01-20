@@ -10,6 +10,7 @@ namespace Microsoft.Maui.Controls
 {
 	/// <include file="../../docs/Microsoft.Maui.Controls/FormattedString.xml" path="Type[@FullName='Microsoft.Maui.Controls.FormattedString']/Docs/*" />
 	[ContentProperty("Spans")]
+	[TypeConverter(typeof(FormattedStringConverter))]
 	public class FormattedString : Element
 	{
 		readonly SpanCollection _spans = new SpanCollection();
@@ -44,7 +45,7 @@ namespace Microsoft.Maui.Controls
 					var bo = item as Span;
 					if (bo != null)
 					{
-						bo.Parent = null;
+						bo.Parent?.RemoveLogicalChild(bo);
 						bo.PropertyChanging -= OnItemPropertyChanging;
 						bo.PropertyChanged -= OnItemPropertyChanged;
 					}
@@ -59,7 +60,7 @@ namespace Microsoft.Maui.Controls
 					var bo = item as Span;
 					if (bo != null)
 					{
-						bo.Parent = this;
+						this.AddLogicalChild(bo);
 						bo.PropertyChanging += OnItemPropertyChanging;
 						bo.PropertyChanged += OnItemPropertyChanged;
 					}
@@ -85,6 +86,35 @@ namespace Microsoft.Maui.Controls
 				var removed = new List<Span>(this);
 				base.ClearItems();
 				base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
+			}
+		}
+
+		private sealed class FormattedStringConverter : TypeConverter
+		{
+			public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+				=> sourceType == typeof(string);
+
+			public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
+				=> destinationType == typeof(string);
+
+			public override object ConvertFrom(ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value)
+			{
+				if (value is string strValue)
+				{
+					return (FormattedString)strValue;
+				}
+
+				throw new NotSupportedException();
+			}
+
+			public override object ConvertTo(ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value, Type destinationType)
+			{
+				if (value is FormattedString formattedStr)
+				{
+					return (string)formattedStr;
+				}
+
+				throw new NotSupportedException();
 			}
 		}
 	}

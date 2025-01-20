@@ -25,9 +25,9 @@ namespace Microsoft.Maui.Controls.Compatibility.Platform.Tizen
 	{
 		event EventHandler<VisualElementChangedEventArgs> _elementChanged;
 
-		readonly Dictionary<string, Action<bool>> _propertyHandlersWithInit = new Dictionary<string, Action<bool>>();
+		readonly Dictionary<string, Action<bool>> _propertyHandlersWithInit = new(StringComparer.Ordinal);
 
-		readonly Dictionary<string, Action> _propertyHandlers = new Dictionary<string, Action>();
+		readonly Dictionary<string, Action> _propertyHandlers = new(StringComparer.Ordinal);
 
 		readonly HashSet<string> _batchedProperties = new HashSet<string>();
 
@@ -260,7 +260,7 @@ namespace Microsoft.Maui.Controls.Compatibility.Platform.Tizen
 			{
 				// This is the reason why I call SendDisappearing() here.
 				// When OnChildRemove is called first like how it is called in Navigation.PopToRootAsync(),
-				// you can not controll using SendDisappearing() on the lower class.
+				// you cannot control using SendDisappearing() on the lower class.
 				(Element as IPageController)?.SendDisappearing();
 
 				if (Element != null)

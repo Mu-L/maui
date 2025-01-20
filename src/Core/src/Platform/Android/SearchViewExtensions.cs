@@ -118,6 +118,27 @@ namespace Microsoft.Maui.Platform
 			}
 		}
 
+		internal static void UpdateSearchIconColor(this SearchView searchView, ISearchBar searchBar)
+		{
+			if (searchView.Resources is null)
+				return;
+
+			var searchIconIdentifier = Resource.Id.search_mag_icon;
+
+			if (searchIconIdentifier > 0)
+			{
+				var image = searchView.FindViewById<ImageView>(searchIconIdentifier);
+
+				if (image?.Drawable is not null)
+				{
+					if (searchBar.SearchIconColor is not null)
+						image.Drawable.SetColorFilter(searchBar.SearchIconColor, FilterMode.SrcIn);
+					else
+						image.Drawable.ClearColorFilter();
+				}
+			}
+		}
+
 		public static void UpdateIsTextPredictionEnabled(this SearchView searchView, ISearchBar searchBar, EditText? editText = null)
 		{
 			editText ??= searchView.GetFirstChildOfType<EditText>();
@@ -126,9 +147,22 @@ namespace Microsoft.Maui.Platform
 				return;
 
 			if (searchBar.IsTextPredictionEnabled)
-				editText.InputType &= ~InputTypes.TextFlagNoSuggestions;
+				editText.InputType |= InputTypes.TextFlagAutoCorrect;
 			else
+				editText.InputType &= ~InputTypes.TextFlagAutoCorrect;
+		}
+
+		public static void UpdateIsSpellCheckEnabled(this SearchView searchView, ISearchBar searchBar, EditText? editText = null)
+		{
+			editText ??= searchView.GetFirstChildOfType<EditText>();
+
+			if (editText == null)
+				return;
+
+			if (!searchBar.IsSpellCheckEnabled)
 				editText.InputType |= InputTypes.TextFlagNoSuggestions;
+			else
+				editText.InputType &= ~InputTypes.TextFlagNoSuggestions;
 		}
 
 		public static void UpdateIsEnabled(this SearchView searchView, ISearchBar searchBar, EditText? editText = null)

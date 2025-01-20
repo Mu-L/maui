@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Microsoft.Maui.Handlers
 {
@@ -13,8 +11,7 @@ namespace Microsoft.Maui.Handlers
 			_ = PlatformView ?? throw new InvalidOperationException($"{nameof(PlatformView)} should have been set by base class.");
 			_ = VirtualView ?? throw new InvalidOperationException($"{nameof(VirtualView)} should have been set by base class.");
 
-			PlatformView.CrossPlatformMeasure = VirtualView.CrossPlatformMeasure;
-			PlatformView.CrossPlatformArrange = VirtualView.CrossPlatformArrange;
+			PlatformView.CrossPlatformLayout = VirtualView;
 		}
 
 		static void UpdateContent(IContentViewHandler handler)
@@ -23,10 +20,12 @@ namespace Microsoft.Maui.Handlers
 			_ = handler.VirtualView ?? throw new InvalidOperationException($"{nameof(VirtualView)} should have been set by base class.");
 			_ = handler.MauiContext ?? throw new InvalidOperationException($"{nameof(MauiContext)} should have been set by base class.");
 
-			handler.PlatformView.Children.Clear();
+			handler.PlatformView.CachedChildren.Clear();
 
 			if (handler.VirtualView.PresentedContent is IView view)
-				handler.PlatformView.Children.Add(view.ToPlatform(handler.MauiContext));
+			{
+				handler.PlatformView.CachedChildren.Add(view.ToPlatform(handler.MauiContext));
+			}
 		}
 
 		protected override ContentPanel CreatePlatformView()
@@ -38,22 +37,22 @@ namespace Microsoft.Maui.Handlers
 
 			var view = new ContentPanel
 			{
-				CrossPlatformMeasure = VirtualView.CrossPlatformMeasure,
-				CrossPlatformArrange = VirtualView.CrossPlatformArrange
+				CrossPlatformLayout = VirtualView
 			};
 
 			return view;
 		}
 
-		public static void MapContent(IContentViewHandler handler, IContentView page)
+		public static partial void MapContent(IContentViewHandler handler, IContentView page)
 		{
 			UpdateContent(handler);
 		}
 
 		protected override void DisconnectHandler(ContentPanel platformView)
 		{
-			platformView.CrossPlatformMeasure = null;
-			platformView.CrossPlatformArrange = null;
+			platformView.CrossPlatformLayout = null;
+			platformView.CachedChildren?.Clear();
+
 			base.DisconnectHandler(platformView);
 		}
 	}

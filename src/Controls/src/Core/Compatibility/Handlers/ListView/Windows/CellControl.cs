@@ -21,7 +21,7 @@ using WSolidColorBrush = Microsoft.UI.Xaml.Media.SolidColorBrush;
 
 namespace Microsoft.Maui.Controls.Platform.Compatibility
 {
-	public class CellControl : ContentControl
+	public partial class CellControl : ContentControl
 	{
 		public static readonly DependencyProperty CellProperty = DependencyProperty.Register("Cell", typeof(object), typeof(CellControl),
 			new PropertyMetadata(null, (o, e) => ((CellControl)o).SetSource((Cell)e.OldValue, (Cell)e.NewValue)));
@@ -69,6 +69,9 @@ namespace Microsoft.Maui.Controls.Platform.Compatibility
 			Cell.SendDisappearing();
 			// 🚀 unsubscribe from propertychanged
 			Cell.PropertyChanged -= _propertyChangedHandler;
+			// Allows the Cell to unsubscribe from Parent.PropertyChanged
+			if (Cell.Parent is ListView)
+				Cell.Parent = null;
 		}
 
 

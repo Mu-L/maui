@@ -68,6 +68,12 @@ namespace Microsoft.Maui.DeviceTests
 					var rootView = handler.PlatformView.Content;
 					ContentPage modalPage = new ContentPage();
 
+					var previousPageNavigationRootManager = navPage.CurrentPage
+						.FindMauiContext()
+						.GetNavigationRootManager();
+
+					var previousWindowRootView = previousPageNavigationRootManager.RootView as WindowRootView;
+
 					await navPage.CurrentPage.Navigation.PushModalAsync(modalPage);
 					await OnLoadedAsync(modalPage);
 
@@ -75,15 +81,75 @@ namespace Microsoft.Maui.DeviceTests
 						.FindMauiContext()
 						.GetNavigationRootManager();
 
-
 					var mauiWindow = (MauiWinUIWindow)handler.PlatformView;
 					Assert.Equal("Original Title", mauiWindow.Title);
 					Assert.Equal(modalNavigationRootManager.WindowTitle, mauiWindow.Title);
 
+					// Ensure previous page has hidden its titlebar
+					Assert.True(previousWindowRootView.AppTitleBarContainer.Visibility == UI.Xaml.Visibility.Collapsed);
+					Assert.True(previousWindowRootView.NavigationViewControl?.ButtonHolderGrid.Visibility == UI.Xaml.Visibility.Collapsed);
+
 					window.Title = "Update Title";
 					Assert.Equal("Update Title", mauiWindow.Title);
 					Assert.Equal(modalNavigationRootManager.WindowTitle, mauiWindow.Title);
+
+					// Ensure titlebar is visible after popping modal
+					var modalWindowRootView = modalNavigationRootManager.RootView as WindowRootView;
+					Assert.True(modalWindowRootView.AppTitleBarContainer.Visibility == UI.Xaml.Visibility.Visible);
+					Assert.True(modalWindowRootView.NavigationViewControl.ButtonHolderGrid.Visibility == UI.Xaml.Visibility.Visible);
 				});
+		}
+
+		[Fact]
+		public async Task WindowTitleIsCorrectAfterPushAndPop()
+		{
+			const string OriginalTitle = "Original Title";
+			const string UpdatedTitle = "Updated Title";
+
+			SetupBuilder();
+
+			var navPage = new NavigationPage(new ContentPage());
+			var window = new Window(navPage) { Title = OriginalTitle };
+
+			await CreateHandlerAndAddToWindow(window,
+				(Func<IWindowHandler, Task>)(async (handler) =>
+				{
+					var mauiWindow = handler.PlatformView;
+					var currentPage = navPage.CurrentPage;
+					var modalPage = new ContentPage();
+
+					await currentPage.Navigation.PushModalAsync(modalPage);
+					await OnLoadedAsync(modalPage);
+
+					var currentNavigationRootManager = currentPage
+						.FindMauiContext()
+						.GetNavigationRootManager();
+					var modalNavigationRootManager = modalPage
+						.FindMauiContext()
+						.GetNavigationRootManager();
+
+					Assert.Equal(OriginalTitle, mauiWindow.Title);
+					Assert.Equal(OriginalTitle, currentNavigationRootManager.WindowTitle);
+					Assert.Equal(OriginalTitle, modalNavigationRootManager.WindowTitle);
+
+					window.Title = UpdatedTitle;
+
+					Assert.Equal(UpdatedTitle, mauiWindow.Title);
+					Assert.Equal(UpdatedTitle, currentNavigationRootManager.WindowTitle);
+					Assert.Equal(UpdatedTitle, modalNavigationRootManager.WindowTitle);
+
+					await currentPage.Navigation.PopModalAsync();
+					await OnUnloadedAsync(modalPage);
+
+					Assert.Equal(UpdatedTitle, mauiWindow.Title);
+					Assert.Equal(UpdatedTitle, currentNavigationRootManager.WindowTitle);
+					Assert.Equal(UpdatedTitle, modalNavigationRootManager.WindowTitle);
+
+					// Ensure titlebar is visible after popping modal
+					var windowRootView = currentNavigationRootManager.RootView as WindowRootView;
+					Assert.True(windowRootView.AppTitleBarContainer.Visibility == UI.Xaml.Visibility.Visible);
+					Assert.True(windowRootView.NavigationViewControl.ButtonHolderGrid.Visibility == UI.Xaml.Visibility.Visible);
+				}));
 		}
 	}
 }

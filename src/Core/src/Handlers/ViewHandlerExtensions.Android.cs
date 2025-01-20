@@ -87,8 +87,8 @@ namespace Microsoft.Maui
 			}
 
 			// Create a spec to handle the native measure
-			var widthSpec = Context.CreateMeasureSpec(widthConstraint, virtualView.Width, virtualView.MaximumWidth);
-			var heightSpec = Context.CreateMeasureSpec(heightConstraint, virtualView.Height, virtualView.MaximumHeight);
+			var widthSpec = Context.CreateMeasureSpec(widthConstraint, virtualView.Width, virtualView.MinimumWidth, virtualView.MaximumWidth);
+			var heightSpec = Context.CreateMeasureSpec(heightConstraint, virtualView.Height, virtualView.MinimumHeight, virtualView.MaximumHeight);
 
 			var packed = PlatformInterop.MeasureAndGetWidthAndHeight(platformView, widthSpec, heightSpec);
 			var measuredWidth = (int)(packed >> 32);
@@ -135,6 +135,14 @@ namespace Microsoft.Maui
 			viewHandler.Invoke(nameof(IView.Frame), frame);
 		}
 
+		/// <summary>
+		/// The measure pass might have an Unspecified/AtMost measure specs,
+		/// and this means the text is probably on the edge of the view.
+		/// This is because the view is trying to take up the least amount of 
+		/// space possible.
+		/// In order to finally place the text in the correct position,
+		/// we need to measure it again with more exact/final sizes.
+		/// </summary>
 		internal static void PrepareForTextViewArrange(this IViewHandler handler, Rect frame)
 		{
 			if (frame.Width < 0 || frame.Height < 0)
@@ -143,9 +151,7 @@ namespace Microsoft.Maui
 			}
 
 			var platformView = handler.ToPlatform();
-			var context = platformView?.Context;
-
-			if (platformView == null || context == null)
+			if (platformView == null)
 			{
 				return;
 			}
@@ -160,11 +166,11 @@ namespace Microsoft.Maui
 			// in order to properly handle any TextAlignment properties and some internal bookkeeping
 			if (virtualView.NeedsExactMeasure())
 			{
-				platformView.Measure(context.MakeMeasureSpecExact(frame.Width), context.MakeMeasureSpecExact(frame.Height));
+				platformView.Measure(platformView.MakeMeasureSpecExact(frame.Width), platformView.MakeMeasureSpecExact(frame.Height));
 			}
 		}
 
-		internal static bool NeedsExactMeasure(this IView virtualView)
+		static bool NeedsExactMeasure(this IView virtualView)
 		{
 			if (virtualView.VerticalLayoutAlignment != Primitives.LayoutAlignment.Fill
 				&& virtualView.HorizontalLayoutAlignment != Primitives.LayoutAlignment.Fill)
@@ -185,10 +191,10 @@ namespace Microsoft.Maui
 			return true;
 		}
 
-		internal static int MakeMeasureSpecExact(this Context context, double size)
+		internal static int MakeMeasureSpecExact(this PlatformView view, double size)
 		{
 			// Convert to a native size to create the spec for measuring
-			var deviceSize = (int)context!.ToPixels(size);
+			var deviceSize = (int)view.ToPixels(size);
 			return MeasureSpecMode.Exactly.MakeMeasureSpec(deviceSize);
 		}
 	}

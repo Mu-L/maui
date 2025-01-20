@@ -21,6 +21,10 @@ namespace Microsoft.Maui.Handlers
 #if __ANDROID__ || WINDOWS || TIZEN
 			[nameof(IImage.Background)] = MapBackground,
 #endif
+#if WINDOWS
+			[nameof(IImage.Height)] = MapHeight,
+			[nameof(IImage.Width)] = MapWidth,
+#endif
 			[nameof(IImage.Aspect)] = MapAspect,
 			[nameof(IImage.IsAnimationPlaying)] = MapIsAnimationPlaying,
 			[nameof(IImage.Source)] = MapSource,
@@ -31,10 +35,11 @@ namespace Microsoft.Maui.Handlers
 		};
 
 		ImageSourcePartLoader? _imageSourcePartLoader;
-		public ImageSourcePartLoader SourceLoader =>
-			_imageSourcePartLoader ??= new ImageSourcePartLoader(this, () => VirtualView, OnSetImageSource);
 
-		public ImageHandler() : base(Mapper)
+		public virtual ImageSourcePartLoader SourceLoader =>
+			_imageSourcePartLoader ??= new ImageSourcePartLoader(new ImageImageSourcePartSetter(this));
+
+		public ImageHandler() : base(Mapper, CommandMapper)
 		{
 		}
 
@@ -53,5 +58,13 @@ namespace Microsoft.Maui.Handlers
 		IImage IImageHandler.VirtualView => VirtualView;
 
 		PlatformView IImageHandler.PlatformView => PlatformView;
+
+		partial class ImageImageSourcePartSetter : ImageSourcePartSetter<IImageHandler>
+		{
+			public ImageImageSourcePartSetter(IImageHandler handler)
+				: base(handler)
+			{
+			}
+		}
 	}
 }

@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using Android.Content;
 using Android.OS;
+using Android.Views;
 using AndroidX.Fragment.App;
 using AndroidX.Navigation;
 using AndroidX.Navigation.Fragment;
 using AndroidX.Navigation.UI;
 using Java.Interop;
+using Java.Lang;
 using AToolbar = AndroidX.AppCompat.Widget.Toolbar;
 using AView = Android.Views.View;
 
@@ -29,6 +31,7 @@ namespace Microsoft.Maui.Platform
 		internal bool? IsPopping { get; private set; }
 		internal bool IsAnimated { get; set; } = true;
 		internal NavigationRequest? ActiveRequestedArgs { get; private set; }
+		internal NavigationRequest? OnResumeRequestedArgs { get; private set; }
 		public IReadOnlyList<IView> NavigationStack { get; private set; } = new List<IView>();
 
 		internal NavHostFragment NavHost =>
@@ -42,6 +45,8 @@ namespace Microsoft.Maui.Platform
 
 		internal NavGraph NavGraph => _navGraph ??
 			throw new InvalidOperationException($"NavGraph cannot be null");
+
+		internal bool HasNavHost => _navHost is not null;
 
 		public IView CurrentPage
 			=> _currentPage ?? throw new InvalidOperationException("CurrentPage cannot be null");
@@ -77,7 +82,7 @@ namespace Microsoft.Maui.Platform
 		 * */
 		void ApplyNavigationRequest(NavigationRequest args)
 		{
-			if (IsNavigating)
+			if (IsNavigating && OnResumeRequestedArgs is null)
 			{
 				// This should really never fire for the developer. Our xplat code should be handling waiting for navigation to
 				// complete before requesting another navigation from Core
@@ -91,6 +96,15 @@ namespace Microsoft.Maui.Platform
 			}
 
 			ActiveRequestedArgs = args;
+
+			if (_fragmentManager?.IsStateSaved == true)
+			{
+				OnResumeRequestedArgs = args;
+				return;
+			}
+
+			OnResumeRequestedArgs = null;
+
 			IReadOnlyList<IView> newPageStack = args.NavigationStack;
 			bool animated = args.Animated;
 			var navController = NavController;
@@ -140,17 +154,8 @@ namespace Microsoft.Maui.Platform
 
 			IsAnimated = animated;
 
-			var iterator = NavController.BackQueue.Iterator();
 			var fragmentNavDestinations = new List<FragmentNavigator.Destination>();
-
-			while (iterator.HasNext)
-			{
-				if (iterator.Next() is NavBackStackEntry nbse &&
-					nbse.Destination is FragmentNavigator.Destination nvd)
-				{
-					fragmentNavDestinations.Add(nvd);
-				}
-			}
+			navController.IterateBackStack(d => fragmentNavDestinations.Add(d));
 
 			// Current BackStack has less entries then incoming new page stack
 			// This will add Back Stack Entries until the back stack and the new stack 
@@ -183,19 +188,16 @@ namespace Microsoft.Maui.Platform
 			// We only keep destinations around that are on the backstack
 			// This iterates over the new backstack and removes any destinations
 			// that are no longer apart of the back stack
-			var iterateNewStack = NavController.BackQueue.Iterator();
-			int startId = -1;
-			while (iterateNewStack.HasNext)
-			{
-				if (iterateNewStack.Next() is NavBackStackEntry nbse &&
-					nbse.Destination is FragmentNavigator.Destination nvd)
-				{
-					fragmentNavDestinations.Remove(nvd);
 
-					if (startId == -1)
-						startId = nvd.Id;
-				}
-			}
+			var iterateNewStack = NavController.Graph.Iterator();
+			int startId = -1;
+
+			navController.IterateBackStack(nvd =>
+			{
+				if (startId == -1)
+					startId = nvd.Id;
+				fragmentNavDestinations.Remove(nvd);
+			});
 
 			foreach (var activeDestinations in fragmentNavDestinations)
 			{
@@ -204,8 +206,10 @@ namespace Microsoft.Maui.Platform
 
 			// If we end up removing the destination that was initially the StartDestination
 			// The Navigation Graph can get really confused
+#pragma warning disable CS0618 // Obsolete
 			if (NavGraph.StartDestination != startId)
 				NavGraph.StartDestination = startId;
+#pragma warning restore CS0618 // Obsolete
 
 			// The NavigationIcon on the toolbar gets set inside the Navigate call so this is the earliest
 			// point in time that we can setup toolbar colors for the incoming page
@@ -247,14 +251,6 @@ namespace Microsoft.Maui.Platform
 		{
 			var navController = NavController;
 
-			// We are subtracting one because the navgraph itself is the first item on the stack
-			int PlatformNavigationStackCount = navController.BackQueue.Size() - 1;
-
-			// set this to one because when the graph is first attached to the controller
-			// it will add the graph and the first destination
-			if (PlatformNavigationStackCount < 0)
-				PlatformNavigationStackCount = 1;
-
 			List<int> destinations = new List<int>();
 
 			NavDestination navDestination;
@@ -267,6 +263,15 @@ namespace Microsoft.Maui.Platform
 
 			NavGraph.StartDestination = destinations[0];
 			navController.SetGraph(NavGraph, null);
+
+			int PlatformNavigationStackCount = 0;
+
+			navController.IterateBackStack(_ => PlatformNavigationStackCount++);
+
+			// set this to one because when the graph is first attached to the controller
+			// it will add the graph and the first destination
+			if (PlatformNavigationStackCount < 0)
+				PlatformNavigationStackCount = 1;
 
 			for (var i = PlatformNavigationStackCount; i < pages.Count; i++)
 			{
@@ -288,6 +293,12 @@ namespace Microsoft.Maui.Platform
 		{
 			if (IsNavigating)
 				NavigationFinished(NavigationView);
+
+			if (_fragmentContainerView is not null)
+			{
+				_fragmentContainerView.ViewAttachedToWindow -= OnNavigationPlatformViewAttachedToWindow;
+				_fragmentContainerView.ChildViewAdded -= OnNavigationHostViewAdded;
+			}
 
 			_fragmentLifecycleCallbacks?.Disconnect();
 			_fragmentLifecycleCallbacks = null;
@@ -315,11 +326,52 @@ namespace Microsoft.Maui.Platform
 
 			if (_navHost == null)
 				throw new InvalidOperationException($"No NavHostFragment found");
+
+			if (_fragmentContainerView is not null)
+			{
+				_fragmentContainerView.ViewAttachedToWindow += OnNavigationPlatformViewAttachedToWindow;
+				_fragmentContainerView.ChildViewAdded += OnNavigationHostViewAdded;
+			}
 		}
 
+		void OnNavigationPlatformViewAttachedToWindow(object? sender, AView.ViewAttachedToWindowEventArgs e)
+		{
+			// If the previous Navigation Host Fragment was destroyed then we need to add a new one
+			if (_fragmentManager.IsDestroyed(MauiContext.Context) &&
+				_fragmentContainerView is not null &&
+				_fragmentContainerView.Fragment is null)
+			{
+				var fragmentManager = MauiContext.GetFragmentManager();
+
+				if (fragmentManager.IsDestroyed(MauiContext.Context))
+					return;
+
+				var navHostFragment = new MauiNavHostFragment()
+				{
+					StackNavigationManager = this
+				};
+
+				// We can't call CheckForFragmentChange right away. The Fragment has to finish attaching
+				// before we can start interacting with the Navigation Host.
+				// OnNavigationHostViewAdded takes care of calling CheckForFragmentChange once the
+				// view has been added
+				fragmentManager
+					.BeginTransactionEx()
+					.AddEx(_fragmentContainerView.Id, navHostFragment)
+					.Commit();
+			}
+		}
+
+		void OnNavigationHostViewAdded(object? sender, ViewGroup.ChildViewAddedEventArgs e)
+		{
+			CheckForFragmentChange();
+		}
 
 		internal void CheckForFragmentChange()
 		{
+			if (_fragmentContainerView?.Fragment is null)
+				return;
+
 			var fragmentManager = MauiContext.GetFragmentManager();
 			var navHostFragment = _fragmentContainerView?.Fragment;
 
@@ -491,6 +543,12 @@ namespace Microsoft.Maui.Platform
 			{
 				if (_stackNavigationManager?.VirtualView == null)
 					return;
+
+				if (_stackNavigationManager.OnResumeRequestedArgs is not null)
+				{
+					_stackNavigationManager.ApplyNavigationRequest(_stackNavigationManager.OnResumeRequestedArgs);
+					return;
+				}
 
 				if (f is NavigationViewFragment pf)
 					_stackNavigationManager.OnNavigationViewFragmentResumed(fm, pf);

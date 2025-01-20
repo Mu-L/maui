@@ -75,6 +75,9 @@ namespace Microsoft.Maui.Handlers
 			handler.PlatformView?.Entry.UpdateIsTextPredictionEnabled(searchBar);
 		}
 
+		[MissingMapper]
+		public static void MapIsSpellCheckEnabled(ISearchBarHandler handler, ISearchBar searchBar) { }
+
 		public static void MapKeyboard(ISearchBarHandler handler, ISearchBar searchBar)
 		{
 			handler.PlatformView?.Entry.UpdateKeyboard(searchBar);
@@ -82,6 +85,9 @@ namespace Microsoft.Maui.Handlers
 
 		[MissingMapper]
 		public static void MapCancelButtonColor(ISearchBarHandler handler, ISearchBar searchBar) { }
+		
+		[MissingMapper]
+		internal static void MapSearchIconColor(ISearchBarHandler handler, ISearchBar searchBar) { }
 
 		public static void MapCharacterSpacing(ISearchBarHandler handler, ISearchBar searchBar)
 		{

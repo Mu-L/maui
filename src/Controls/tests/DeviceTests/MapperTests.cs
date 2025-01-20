@@ -12,6 +12,7 @@ using Xunit;
 
 namespace Microsoft.Maui.DeviceTests
 {
+	[Category(TestCategory.Mapper)]
 	public class MapperTests : ControlsHandlerTestBase
 	{
 		[Theory]
@@ -28,8 +29,6 @@ namespace Microsoft.Maui.DeviceTests
 		{
 			private readonly List<object[]> _data = new()
 			{
-				new object[] { VisualElement.ControlsVisualElementMapper, typeof(IView), typeof(IViewHandler) },
-				new object[] { Element.ControlsElementMapper, typeof(IElement), typeof(IElementHandler) },
 				new object[] { ViewHandler.ViewMapper, typeof(IView), typeof(IViewHandler) },
 				new object[] { ElementHandler.ElementMapper, typeof(IElement), typeof(IElementHandler) },
 			};

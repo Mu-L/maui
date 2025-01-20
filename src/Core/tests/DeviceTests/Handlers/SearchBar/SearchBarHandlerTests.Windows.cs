@@ -3,6 +3,7 @@ using Microsoft.Maui.DeviceTests.Stubs;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Xunit;
+using static Microsoft.Maui.DeviceTests.AssertHelpers;
 
 namespace Microsoft.Maui.DeviceTests
 {
@@ -22,33 +23,13 @@ namespace Microsoft.Maui.DeviceTests
 				CancelButtonColor = expected
 			};
 
-			searchBar.Focus();
+			// The cancel button won't exist in the SearchBar until the SearchBar is loaded (and OnApplyTemplate is called)
+			// so we need to attach the SearchBar to the running app before we can check the color
 
 			await AttachAndRun(searchBar, async (searchBarHandler) =>
 			{
-				await AssertionExtensions.Wait(() => searchBarHandler.PlatformView.FocusState != UI.Xaml.FocusState.Unfocused);
+				await ValidatePropertyInitValue(searchBar, () => searchBar.CancelButtonColor, GetNativeCancelButtonColor, expected);
 			});
-
-			await ValidatePropertyInitValue(searchBar, () => searchBar.CancelButtonColor, GetNativeCancelButtonColor, expected);
-		}
-
-		[Theory(DisplayName = "Is Text Prediction Enabled")]
-		[InlineData(true)]
-		[InlineData(false)]
-		public async Task IsTextPredictionEnabledCorrectly(bool isEnabled)
-		{
-			var searchBar = new SearchBarStub()
-			{
-				IsTextPredictionEnabled = isEnabled
-			};
-
-			await AttachAndRun(searchBar, async (searchBarHandler) =>
-			{
-				await AssertionExtensions.Wait(() => searchBarHandler.PlatformView.Width != 0);
-			});
-
-			var nativeIsTextPredictionEnabled = await GetValueAsync(searchBar, GetNativeIsTextPredictionEnabled);
-			Assert.Equal(isEnabled, nativeIsTextPredictionEnabled);
 		}
 
 		static AutoSuggestBox GetNativeSearchBar(SearchBarHandler searchBarHandler) =>
@@ -114,6 +95,20 @@ namespace Microsoft.Maui.DeviceTests
 			if (textBox is not null)
 			{
 				return textBox.IsTextPredictionEnabled;
+			}
+
+			return false;
+		}
+
+		bool GetNativeIsSpellCheckEnabled(SearchBarHandler searchBarHandler)
+		{
+			var platformSearchBar = GetNativeSearchBar(searchBarHandler);
+
+			var textBox = platformSearchBar.GetFirstDescendant<TextBox>();
+
+			if (textBox is not null)
+			{
+				return textBox.IsSpellCheckEnabled;
 			}
 
 			return false;

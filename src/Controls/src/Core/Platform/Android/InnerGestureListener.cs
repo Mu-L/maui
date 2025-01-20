@@ -62,7 +62,7 @@ namespace Microsoft.Maui.Controls.Platform
 
 		bool HasAnyGestures()
 		{
-			return _panGestureHandler.HasAnyGestures() || _tapGestureHandler.HasAnyGestures() || _swipeGestureHandler.HasAnyGestures();
+			return (_panGestureHandler?.HasAnyGestures() ?? false) || (_tapGestureHandler?.HasAnyGestures() ?? false) || (_swipeGestureHandler?.HasAnyGestures() ?? false);
 		}
 
 		// This is needed because GestureRecognizer callbacks can be delayed several hundred milliseconds
@@ -82,19 +82,23 @@ namespace Microsoft.Maui.Controls.Platform
 				return _tapDelegate(2, e);
 			}
 
-			if (HasSingleTapHandler())
-			{
-				// If we're registering double taps and we don't actually have a double-tap handler,
-				// but we _do_ have a single-tap handler, then we're really just seeing two singles in a row
-				// Fire off the delegate for the second single-tap (OnSingleTapUp already did the first one)
-				return _tapDelegate(1, e);
-			}
+			// If we're getting here and don't have a double-tap handler, we might be looking at multiple
+			// single taps; that'll be handled in OnDoubleTapEvent
 
 			return false;
 		}
 
 		bool GestureDetector.IOnDoubleTapListener.OnDoubleTapEvent(MotionEvent e)
 		{
+			if (!HasDoubleTapHandler() && HasSingleTapHandler() && e.Action == MotionEventActions.Up)
+			{
+				// If we're registering double taps and we don't actually have a double-tap handler,
+				// but we _do_ have a single-tap handler, then we're really just seeing two singles in a row
+
+				// Fire off the delegate for the second single-tap (OnSingleTapUp already did the first one)
+				return _tapDelegate(1, e);
+			}
+
 			return false;
 		}
 

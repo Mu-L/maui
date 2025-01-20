@@ -1,6 +1,5 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.Maui.DeviceTests.Stubs;
-using Microsoft.Maui.Hosting;
 using Xunit;
 
 namespace Microsoft.Maui.DeviceTests
@@ -64,11 +63,10 @@ namespace Microsoft.Maui.DeviceTests
 				Text = "Hello"
 			};
 
-
 			int cursorPosition = 0;
-			await InvokeOnMainThreadAsync(() =>
+
+			await AttachAndRun(textInput, handler =>
 			{
-				var handler = CreateHandler<THandler>(textInput);
 				UpdateCursorStartPosition(handler, 5);
 				handler.UpdateValue(nameof(ITextInput.Text));
 				cursorPosition = GetCursorStartPosition(handler);

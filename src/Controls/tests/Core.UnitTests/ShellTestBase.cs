@@ -9,6 +9,7 @@ using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Devices;
 using Xunit;
+using Xunit.Sdk;
 
 namespace Microsoft.Maui.Controls.Core.UnitTests
 {
@@ -88,7 +89,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[QueryProperty("SomeQueryParameter", "SomeQueryParameter")]
 		[QueryProperty("CancelNavigationOnBackButtonPressed", "CancelNavigationOnBackButtonPressed")]
 		[QueryProperty("ComplexObject", "ComplexObject")]
-		public class ShellTestPage : ContentPage
+		public class ShellTestPage : ContentPage, IQueryAttributable
 		{
 			public string CancelNavigationOnBackButtonPressed { get; set; }
 			public ShellTestPage()
@@ -127,6 +128,15 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 					return false;
 
 				return base.OnBackButtonPressed();
+			}
+
+			public List<IDictionary<string, object>> AppliedQueryAttributes = new List<IDictionary<string, object>>();
+			public void ApplyQueryAttributes(IDictionary<string, object> query)
+			{
+				if (query is ShellNavigationQueryParameters param && param.IsReadOnly)
+					AppliedQueryAttributes.Add(query);
+				else
+					AppliedQueryAttributes.Add(new Dictionary<string, object>(query));
 			}
 		}
 
@@ -385,14 +395,18 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 				OnNavigatingCount++;
 			}
 
-			public void TestNavigationArgs(ShellNavigationSource source, string from, string to)
+			public async Task TestNavigationArgs(ShellNavigationSource source, string from, string to)
 			{
-				TestNavigatingArgs(source, from, to);
-				TestNavigatedArgs(source, from, to);
+				await TestNavigatingArgs(source, from, to);
+				await TestNavigatedArgs(source, from, to);
 			}
 
-			public void TestNavigatedArgs(ShellNavigationSource source, string from, string to)
+			public async Task TestNavigatedArgs(ShellNavigationSource source, string from, string to)
 			{
+				// Let shell tasks finish resolving
+				if (source != this.LastShellNavigatedEventArgs.Source)
+					await Task.Delay(10).ConfigureAwait(false);
+
 				Assert.Equal(source, this.LastShellNavigatedEventArgs.Source);
 
 				if (from == null)
@@ -404,8 +418,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 				Assert.Equal(to, this.CurrentState.Location.ToString());
 			}
 
-			public void TestNavigatingArgs(ShellNavigationSource source, string from, string to)
+			public async Task TestNavigatingArgs(ShellNavigationSource source, string from, string to)
 			{
+				// Let shell tasks finish resolving
+				if (source != this.LastShellNavigatingEventArgs.Source)
+					await Task.Delay(10).ConfigureAwait(false);
+
 				Assert.Equal(source, this.LastShellNavigatingEventArgs.Source);
 
 				if (from == null)

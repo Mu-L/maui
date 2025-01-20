@@ -43,15 +43,15 @@ namespace Microsoft.Maui.Handlers
 		// TODO: NET8 issoto - Change the platformView type to MauiAppCompatEditText
 		protected override void ConnectHandler(AppCompatEditText platformView)
 		{
-			platformView.ViewAttachedToWindow += OnPlatformViewAttachedToWindow;
 			platformView.TextChanged += OnTextChanged;
+			platformView.FocusChange += OnFocusChange;
 		}
 
 		// TODO: NET8 issoto - Change the platformView type to MauiAppCompatEditText
 		protected override void DisconnectHandler(AppCompatEditText platformView)
 		{
-			platformView.ViewAttachedToWindow -= OnPlatformViewAttachedToWindow;
 			platformView.TextChanged -= OnTextChanged;
+			platformView.FocusChange -= OnFocusChange;
 
 			// TODO: NET8 issoto - Remove the casting once we can set the TPlatformView generic type as MauiAppCompatEditText
 			if (_set && platformView is MauiAppCompatEditText editText)
@@ -90,6 +90,9 @@ namespace Microsoft.Maui.Handlers
 		public static void MapIsTextPredictionEnabled(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateIsTextPredictionEnabled(editor);
 
+		public static void MapIsSpellCheckEnabled(IEditorHandler handler, IEditor editor) =>
+			handler.PlatformView?.UpdateIsSpellCheckEnabled(editor);
+
 		public static void MapFont(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateFont(editor, handler.GetRequiredService<IFontManager>());
 
@@ -99,8 +102,12 @@ namespace Microsoft.Maui.Handlers
 		public static void MapVerticalTextAlignment(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateVerticalTextAlignment(editor);
 
-		public static void MapKeyboard(IEditorHandler handler, IEditor editor) =>
+		public static void MapKeyboard(IEditorHandler handler, IEditor editor)
+		{
+			handler.UpdateValue(nameof(IEditor.Text));
+
 			handler.PlatformView?.UpdateKeyboard(editor);
+		}
 
 		public static void MapCursorPosition(IEditorHandler handler, ITextInput editor) =>
 			handler.PlatformView?.UpdateCursorPosition(editor);
@@ -112,16 +119,6 @@ namespace Microsoft.Maui.Handlers
 		{
 			if (args is FocusRequest request)
 				handler.PlatformView.Focus(request);
-		}
-
-		void OnPlatformViewAttachedToWindow(object? sender, ViewAttachedToWindowEventArgs e)
-		{
-			if (PlatformView.IsAlive() && PlatformView.Enabled)
-			{
-				// https://issuetracker.google.com/issues/37095917
-				PlatformView.Enabled = false;
-				PlatformView.Enabled = true;
-			}
 		}
 
 		void OnTextChanged(object? sender, Android.Text.TextChangedEventArgs e)
@@ -144,6 +141,14 @@ namespace Microsoft.Maui.Handlers
 
 			if (VirtualView.SelectionLength != selectedTextLength)
 				VirtualView.SelectionLength = selectedTextLength;
+		}
+
+		private void OnFocusChange(object? sender, FocusChangeEventArgs e)
+		{
+			if (!e.HasFocus)
+			{
+				VirtualView?.Completed();
+			}
 		}
 
 		public override void PlatformArrange(Rect frame)

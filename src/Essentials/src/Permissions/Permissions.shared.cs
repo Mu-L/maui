@@ -218,6 +218,13 @@ namespace Microsoft.Maui.ApplicationModel
 		}
 
 		/// <summary>
+		/// Represents permission to access nearby WiFi devices.
+		/// </summary>
+		public partial class NearbyWifiDevices
+		{
+		}
+
+		/// <summary>
 		/// Represents permission to access the device network state information.
 		/// </summary>
 		public partial class NetworkState
@@ -244,6 +251,14 @@ namespace Microsoft.Maui.ApplicationModel
 		public partial class PhotosAddOnly : BasePlatformPermission
 		{
 		}
+
+		/// <summary>
+		/// Represents permission to post notifications
+		/// </summary>
+		public partial class PostNotifications
+		{
+		}
+
 
 		/// <summary>
 		/// Represents permission to access the device reminders data.

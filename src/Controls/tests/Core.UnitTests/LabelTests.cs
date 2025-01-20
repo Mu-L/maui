@@ -80,21 +80,19 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void LabelResizesWhenFontChanges()
 		{
-			MockPlatformSizeService.Current.GetPlatformSizeFunc = (ve, w, h) =>
+			var label = MockPlatformSizeService.Sub<Label>((ve, w, h) =>
 			{
 				var l = (Label)ve;
 				return new SizeRequest(new Size(l.FontSize, l.FontSize));
-			};
+			});
 
-			var label = new Label { IsPlatformEnabled = true };
-
-			Assert.Equal(label.FontSize, label.Measure(double.PositiveInfinity, double.PositiveInfinity).Request.Width);
+			Assert.Equal(label.FontSize, label.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None).Request.Width);
 
 			bool fired = false;
 
 			label.MeasureInvalidated += (sender, args) =>
 			{
-				Assert.Equal(25, label.Measure(double.PositiveInfinity, double.PositiveInfinity).Request.Width);
+				Assert.Equal(25, label.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None).Request.Width);
 				fired = true;
 			};
 
@@ -119,7 +117,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 			Assert.Equal(label.GetDefaultFontSize(), label.FontSize);
 
-			label.SetValue(Label.FontSizeProperty, 1.0, true);
+			label.SetValue(Label.FontSizeProperty, 1.0, new SetterSpecificity(SetterSpecificity.StyleImplicit, 0, 0, 0));
 			Assert.Equal(1.0, label.FontSize);
 		}
 
@@ -129,10 +127,10 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var label = new Label();
 			Assert.Equal(label.FontSize, label.GetDefaultFontSize());
 
-			label.SetValue(Label.FontSizeProperty, 2.0, false);
+			label.SetValue(Label.FontSizeProperty, 2.0);
 			Assert.Equal(2.0, label.FontSize);
 
-			label.SetValue(Label.FontSizeProperty, 1.0, true);
+			label.SetValue(Label.FontSizeProperty, 1.0, new SetterSpecificity(SetterSpecificity.StyleImplicit, 0, 0, 0));
 			Assert.Equal(2.0, label.FontSize);
 		}
 
@@ -176,6 +174,15 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			vm.VerticalAlignment = TextAlignment.End;
 
 			Assert.Equal(TextAlignment.End, labelVerticalTextAlignment.VerticalTextAlignment);
+		}
+
+		[Fact]
+		public void OriginalLabelTextNotUpdatingAfterBindingIsSet()
+		{
+			var label = new Label() { Text = "sassifrass" };
+			label.BindingContext = 1;
+			label.SetBinding(Label.TextProperty, ".");
+			Assert.Equal("1", label.Text);
 		}
 
 		sealed class ViewModel : INotifyPropertyChanged

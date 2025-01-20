@@ -37,7 +37,7 @@
       <para>The user interface of a tabbed page consists of a list of tabs and a larger detail area. On iOS, the list of tabs appears at the bottom of the screen, and the detail area is above. On Android and Windows phones, the tabs appear across the top of the screen. The user can scroll the collection of tabs that are across the top of the screen if that collection is too large to fit on one screen.</para>
       <para>App developers can create tabbed pages in either of two ways. First, application developers can assign a list of objects of a single class, or its subclasses, to the <see cref="P:Microsoft.Maui.Controls.MultiPage`1.ItemsSource" /> property and assign a <see cref="T:Microsoft.Maui.Controls.DataTemplate" /> to the <see cref="P:Microsoft.Maui.Controls.MultiPage`1.ItemTemplate" /> property to return pages for objects of the least derived type. Second, app developers can add a succession of <see cref="T:Microsoft.Maui.Controls.Page" /> objects to the <see cref="P:Microsoft.Maui.Controls.MultiPage`1.Children" /> property. Both methods are shown in the code examples below.</para>
       <example>
-        <para>The following example code, adapted for brevity from the FormsGallery sample that can be found on the <format type="text/html"><a href="https://docs.microsoft.com/samples/xamarin/xamarin-forms-samples/formsgallery/" target="_blank">Sample Applications</a></format> page, shows how to display data of a specific type by assigning a <see cref="T:Microsoft.Maui.Controls.DataTemplate" /> to the <see cref="P:Microsoft.Maui.Controls.MultiPage`1.ItemTemplate" /> property. Note how <c>NamedColorPage</c> gets its color by binding its <see cref="F:Microsoft.Maui.Controls.BoxView.ColorProperty" /> field.</para>
+        <para>The following example code shows how to display data of a specific type by assigning a <see cref="T:Microsoft.Maui.Controls.DataTemplate" /> to the <see cref="P:Microsoft.Maui.Controls.MultiPage`1.ItemTemplate" /> property. Note how <c>NamedColorPage</c> gets its color by binding its <see cref="F:Microsoft.Maui.Controls.BoxView.ColorProperty" /> field.</para>
         <code lang="csharp lang-csharp"><![CDATA[
 using System;
 using Microsoft.Maui.Controls;
@@ -166,7 +166,6 @@ class TabbedPageDemoPage2 : TabbedPage
       <Parameters />
       <Docs>
         <summary>Creates a new <see cref="T:Microsoft.Maui.Controls.TabbedPage" /> element with default values.</summary>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="BarBackground">
@@ -183,9 +182,6 @@ class TabbedPageDemoPage2 : TabbedPage
         <ReturnType>Microsoft.Maui.Controls.Brush</ReturnType>
       </ReturnValue>
       <Docs>
-        <summary>To be added.</summary>
-        <value>To be added.</value>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="BarBackgroundColor">
@@ -205,7 +201,6 @@ class TabbedPageDemoPage2 : TabbedPage
       <Docs>
         <summary>Gets or sets the background color of the bar.</summary>
         <value>The background color of the bar.</value>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="BarBackgroundColorProperty">
@@ -224,7 +219,6 @@ class TabbedPageDemoPage2 : TabbedPage
       </ReturnValue>
       <Docs>
         <summary>Backing store for the <see cref="P:Microsoft.Maui.Controls.TabbedPage.BarBackgroundColor" /> property.</summary>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="BarBackgroundProperty">
@@ -241,8 +235,6 @@ class TabbedPageDemoPage2 : TabbedPage
         <ReturnType>Microsoft.Maui.Controls.BindableProperty</ReturnType>
       </ReturnValue>
       <Docs>
-        <summary>To be added.</summary>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="BarTextColor">
@@ -262,7 +254,6 @@ class TabbedPageDemoPage2 : TabbedPage
       <Docs>
         <summary>Gets or sets the color of text on the bar.</summary>
         <value>The color of text on the bar.</value>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="BarTextColorProperty">
@@ -281,7 +272,6 @@ class TabbedPageDemoPage2 : TabbedPage
       </ReturnValue>
       <Docs>
         <summary>Backing store for the <see cref="P:Microsoft.Maui.Controls.TabbedPage.BarTextColor" /> property.</summary>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="CreateDefault">
@@ -342,8 +332,6 @@ class TabbedPageDemoPage2 : TabbedPage
       <Docs>
         <typeparam name="T">To be added.</typeparam>
         <summary>Returns the platform-specific instance of this <see cref="T:Microsoft.Maui.Controls.TabbedPage" />, on which a platform-specific method may be called.</summary>
-        <returns>To be added.</returns>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="SelectedTabColor">
@@ -360,9 +348,6 @@ class TabbedPageDemoPage2 : TabbedPage
         <ReturnType>Microsoft.Maui.Graphics.Color</ReturnType>
       </ReturnValue>
       <Docs>
-        <summary>To be added.</summary>
-        <value>To be added.</value>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="SelectedTabColorProperty">
@@ -380,7 +365,6 @@ class TabbedPageDemoPage2 : TabbedPage
       </ReturnValue>
       <Docs>
         <summary>The backing store for the <see cref="P:Microsoft.Maui.Controls.TabbedPage.SelectedTabColor" /> field.</summary>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="UnselectedTabColor">
@@ -397,9 +381,6 @@ class TabbedPageDemoPage2 : TabbedPage
         <ReturnType>Microsoft.Maui.Graphics.Color</ReturnType>
       </ReturnValue>
       <Docs>
-        <summary>To be added.</summary>
-        <value>To be added.</value>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
     <Member MemberName="UnselectedTabColorProperty">
@@ -417,7 +398,6 @@ class TabbedPageDemoPage2 : TabbedPage
       </ReturnValue>
       <Docs>
         <summary>The backing store for the <see cref="P:Microsoft.Maui.Controls.TabbedPage.UnselectedTabColor" /> field.</summary>
-        <remarks>To be added.</remarks>
       </Docs>
     </Member>
   </Members>

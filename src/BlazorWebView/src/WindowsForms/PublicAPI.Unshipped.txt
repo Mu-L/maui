@@ -1,3 +1,1 @@
 #nullable enable
-Microsoft.AspNetCore.Components.WebView.WindowsForms.BlazorWebView.StartPath.get -> string!
-Microsoft.AspNetCore.Components.WebView.WindowsForms.BlazorWebView.StartPath.set -> void

@@ -15,14 +15,21 @@ namespace Microsoft.Maui.Graphics
 {
 	public class MauiDrawable : PaintDrawable
 	{
+		static Join? JoinMiter;
+		static Join? JoinBevel;
+		static Join? JoinRound;
+
+		static Cap? CapButt;
+		static Cap? CapSquare;
+		static Cap? CapRound;
+
 		readonly AContext? _context;
-		readonly double _density;
+		readonly float _density;
 
 		bool _invalidatePath;
 
 		bool _disposed;
 
-		ARect? _bounds;
 		int _width;
 		int _height;
 
@@ -155,6 +162,7 @@ namespace Microsoft.Maui.Graphics
 
 			_borderColor = borderColor;
 
+			InitializeBorderIfNeeded();
 			InvalidateSelf();
 		}
 
@@ -183,6 +191,7 @@ namespace Microsoft.Maui.Graphics
 		{
 			_invalidatePath = true;
 			_borderColor = null;
+			_borderPaint = null;
 
 			var borderColor = solidPaint.Color == null
 				? (AColor?)null
@@ -297,20 +306,13 @@ namespace Microsoft.Maui.Graphics
 
 		public void SetBorderLineJoin(LineJoin lineJoin)
 		{
-			Join? aLineJoin = Join.Miter;
-
-			switch (lineJoin)
+			Join? aLineJoin = lineJoin switch
 			{
-				case LineJoin.Miter:
-					aLineJoin = Join.Miter;
-					break;
-				case LineJoin.Bevel:
-					aLineJoin = Join.Bevel;
-					break;
-				case LineJoin.Round:
-					aLineJoin = Join.Round;
-					break;
-			}
+				LineJoin.Miter => JoinMiter ??= Join.Miter,
+				LineJoin.Bevel => JoinBevel ??= Join.Bevel,
+				LineJoin.Round => JoinRound ??= Join.Round,
+				_ => JoinMiter ??= Join.Miter,
+			};
 
 			if (_strokeLineJoin == aLineJoin)
 				return;
@@ -322,20 +324,13 @@ namespace Microsoft.Maui.Graphics
 
 		public void SetBorderLineCap(LineCap lineCap)
 		{
-			Cap? aLineCap = Cap.Butt;
-
-			switch (lineCap)
+			Cap? aLineCap = lineCap switch
 			{
-				case LineCap.Butt:
-					aLineCap = Cap.Butt;
-					break;
-				case LineCap.Square:
-					aLineCap = Cap.Square;
-					break;
-				case LineCap.Round:
-					aLineCap = Cap.Round;
-					break;
-			}
+				LineCap.Butt => CapButt ??= Cap.Butt,
+				LineCap.Square => CapSquare ??= Cap.Square,
+				LineCap.Round => CapRound ??= Cap.Round,
+				_ => CapButt ??= Cap.Butt,
+			};
 
 			if (_strokeLineCap == aLineCap)
 				return;
@@ -347,31 +342,21 @@ namespace Microsoft.Maui.Graphics
 
 		public void InvalidateBorderBounds()
 		{
-			_bounds = null;
-
 			InvalidateSelf();
 		}
 
 		protected override void OnBoundsChange(ARect bounds)
 		{
-			if (_bounds != bounds)
-			{
-				_bounds = bounds;
+			var width = bounds.Width();
+			var height = bounds.Height();
 
-				if (_bounds != null)
-				{
-					var width = _bounds.Width();
-					var height = _bounds.Height();
+			if (_width == width && _height == height)
+				return;
 
-					if (_width == width && _height == height)
-						return;
+			_invalidatePath = true;
 
-					_invalidatePath = true;
-
-					_width = width;
-					_height = height;
-				}
-			}
+			_width = width;
+			_height = height;
 
 			base.OnBoundsChange(bounds);
 		}
@@ -388,18 +373,12 @@ namespace Microsoft.Maui.Graphics
 
 				if (_borderPaint != null)
 				{
-					_borderPaint.StrokeWidth = _strokeThickness;
-					_borderPaint.StrokeJoin = _strokeLineJoin;
-					_borderPaint.StrokeCap = _strokeLineCap;
-					_borderPaint.StrokeMiter = _strokeMiterLimit * 2;
-
-					if (_borderPathEffect != null)
-						_borderPaint.SetPathEffect(_borderPathEffect);
+					PlatformInterop.SetPaintValues(_borderPaint, _strokeThickness, _strokeLineJoin, _strokeLineCap, _strokeMiterLimit * 2, _borderPathEffect);
 
 					if (_borderColor != null)
-#pragma warning disable CA1416 // https://github.com/xamarin/xamarin-android/issues/6962
+					{
 						_borderPaint.Color = _borderColor.Value;
-#pragma warning restore CA1416
+					}
 					else
 					{
 						if (_stroke != null)
@@ -413,8 +392,14 @@ namespace Microsoft.Maui.Graphics
 
 					if (_shape != null)
 					{
-						var bounds = new Graphics.Rect(0, 0, _width, _height);
-						var clipPath = _shape?.ToPlatform(bounds, _strokeThickness);
+						float strokeThickness = _strokeThickness / _density;
+						float w = (_width / _density) - strokeThickness;
+						float h = (_height / _density) - strokeThickness;
+						float x = strokeThickness / 2;
+						float y = strokeThickness / 2;
+
+						var bounds = new Rect(x, y, w, h);
+						var clipPath = _shape?.ToPlatform(bounds, strokeThickness, _density);
 
 						if (clipPath == null)
 							return;
@@ -427,18 +412,10 @@ namespace Microsoft.Maui.Graphics
 					}
 				}
 
-				if (canvas == null)
+				if (canvas == null || _clipPath == null)
 					return;
 
-				var saveCount = canvas.SaveLayer(0, 0, _width, _height, null);
-
-				if (_clipPath != null && Paint != null)
-					canvas.DrawPath(_clipPath, Paint);
-
-				if (_clipPath != null && _borderPaint != null)
-					canvas.DrawPath(_clipPath, _borderPaint);
-
-				canvas.RestoreToCount(saveCount);
+				PlatformInterop.DrawMauiDrawablePath(this, canvas, _width, _height, _clipPath, _borderPaint);
 			}
 			else
 			{
@@ -512,22 +489,10 @@ namespace Microsoft.Maui.Graphics
 
 		void SetDefaultBackgroundColor()
 		{
-			using (var background = new TypedValue())
+			var color = PlatformInterop.GetWindowBackgroundColor(_context);
+			if (color != -1)
 			{
-				if (_context == null || _context.Theme == null || _context.Resources == null)
-					return;
-
-				if (_context.Theme.ResolveAttribute(global::Android.Resource.Attribute.WindowBackground, background, true))
-				{
-					var resource = _context.Resources.GetResourceTypeName(background.ResourceId);
-					var type = resource?.ToLowerInvariant();
-
-					if (type == "color")
-					{
-						var color = new AColor(ContextCompat.GetColor(_context, background.ResourceId));
-						_backgroundColor = color;
-					}
-				}
+				_backgroundColor = new AColor(color);
 			}
 		}
 
@@ -542,10 +507,13 @@ namespace Microsoft.Maui.Graphics
 					platformPaint.Color = _backgroundColor.Value;
 #pragma warning restore CA1416
 				}
+				else if (_background != null)
+				{
+					SetPaint(platformPaint, _background);
+				}
 				else
 				{
-					if (_background != null)
-						SetPaint(platformPaint, _background);
+					platformPaint.Color = AColor.Transparent;
 				}
 			}
 		}
@@ -615,7 +583,7 @@ namespace Microsoft.Maui.Graphics
 			platformPaint.SetShader(radialGradient);
 		}
 
-		GradientData GetGradientPaintData(GradientPaint gradientPaint)
+		static GradientData GetGradientPaintData(GradientPaint gradientPaint)
 		{
 			var orderStops = gradientPaint.GradientStops;
 

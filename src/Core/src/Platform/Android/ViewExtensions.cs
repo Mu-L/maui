@@ -6,11 +6,12 @@ using Android.Graphics.Drawables;
 using Android.OS;
 using Android.Util;
 using Android.Views;
+using Android.Views.InputMethods;
 using Android.Widget;
 using AndroidX.AppCompat.Widget;
-using AndroidX.ConstraintLayout.Helper.Widget;
 using AndroidX.Core.Content;
-using AndroidX.Window.Layout;
+using AndroidX.Core.View;
+using Kotlin;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Primitives;
@@ -116,6 +117,8 @@ namespace Microsoft.Maui.Platform
 			if (platformView is WrapperView wrapper)
 				wrapper.Shadow = view.Shadow;
 		}
+
+		[Obsolete("IBorder is not used and will be removed in a future release.")]
 		public static void UpdateBorder(this AView platformView, IView view)
 		{
 			if (platformView is WrapperView wrapper)
@@ -182,7 +185,6 @@ namespace Microsoft.Maui.Platform
 		internal static void UpdateBackground(this TextView platformView, IView view) =>
 			UpdateBackground(platformView, view, true);
 
-		// TODO: NET8 make this public for NET8.0
 		internal static void UpdateBackground(this EditText platformView, IView view)
 		{
 			if (platformView is null || platformView.Context is null)
@@ -190,49 +192,78 @@ namespace Microsoft.Maui.Platform
 				return;
 			}
 
-			// Remove previous background gradient if any
-			if (platformView.Background is MauiDrawable mauiDrawable)
+			// The user has removed the background from the platform view in platform code
+			// so we need to make sure to do absolutely nothing.
+			if (platformView.Background is null)
 			{
-				platformView.Background = null;
-				mauiDrawable.Dispose();
+				return;
 			}
 
-			if (platformView.Background is LayerDrawable layerDrawable)
+			// Get the current background of the edit text so we can make sure to not overwite it
+			// if it is not something that we have set in MAUI.
+			var previousDrawable = platformView.Background;
+
+			// Remove the previous MAUI background (if any).
+			if (previousDrawable is MauiDrawable || previousDrawable is MauiLayerDrawable)
 			{
 				platformView.Background = null;
-				layerDrawable.Dispose();
+				previousDrawable.Dispose();
+				previousDrawable = null;
 			}
 
-			// Android will reset the padding when setting a Background drawable	
-			// So we need to reapply the padding after
-			var padLeft = platformView.PaddingLeft;
-			var padTop = platformView.PaddingTop;
-			var padRight = platformView.PaddingRight;
-			var padBottom = platformView.PaddingBottom;
-
+			// Get the new background from the virtual view
 			var paint = view.Background;
-
-			Drawable? defaultBackgroundDrawable = ContextCompat.GetDrawable(platformView.Context, Resource.Drawable.abc_edit_text_material);
-
-			var previousDrawable = defaultBackgroundDrawable ?? platformView.Background;
 			var backgroundDrawable = paint.ToDrawable(platformView.Context);
 
-			if (previousDrawable is null)
-				platformView.Background = backgroundDrawable;
-			else
+			if (backgroundDrawable is not null || previousDrawable is null)
 			{
-				if (backgroundDrawable is null)
-					platformView.Background = previousDrawable;
-				else
-				{
+				// There is a new background to set, or we removed a previous background and
+				// now we have to re-apply just the default "line" background.
 
-					LayerDrawable layer = new LayerDrawable(new Drawable[] { backgroundDrawable, previousDrawable });
-					platformView.Background = layer;
+				// Regardless of what the new background is, we will need to apply the default
+				// background "line" on top of it.
+				// If for some reason this returns null, then there is nothing we can do because
+				// AndroidX is probably broken since this is a resource from the AndroidX library.
+				var defaultBackground = ContextCompat.GetDrawable(platformView.Context, Resource.Drawable.abc_edit_text_material);
+
+				if (backgroundDrawable is not null)
+				{
+					// The user set some background, so we need to apply it below the default "line".
+					// If there is a broken AndroidX, then nothing we can do but just use ours.
+					SetBackground(platformView, defaultBackground is null
+						? new MauiLayerDrawable(backgroundDrawable)
+						: new MauiLayerDrawable(backgroundDrawable, defaultBackground));
+				}
+				else if (previousDrawable is null)
+				{
+					// The user set null in the virtual view (or did not set anything/kept the defaults)
+					// as we just removed a MAUI background from the platform view.
+					// This means we just use the default Material background (the "line").
+					SetBackground(platformView, defaultBackground);
 				}
 			}
+			else
+			{
+				// The drawable currently in use was not a MAUI drawable nor are we setting a new
+				// one so just do nothing and keep whatever the user has set in platform code.
+			}
 
-			// Apply previous padding
-			platformView.SetPadding(padLeft, padTop, padRight, padBottom);
+			// A helper method to set the background and re-apply the padding since
+			// Android will reset the padding when setting a Background drawable.
+			static void SetBackground(EditText platformView, Drawable? background)
+			{
+				// Cache the current padding
+				var padLeft = platformView.PaddingLeft;
+				var padTop = platformView.PaddingTop;
+				var padRight = platformView.PaddingRight;
+				var padBottom = platformView.PaddingBottom;
+
+				// Set the new background
+				platformView.Background = background;
+
+				// Apply previous padding
+				platformView.SetPadding(padLeft, padTop, padRight, padBottom);
+			}
 		}
 
 		public static void UpdateBackground(this AView platformView, Paint? background) =>
@@ -275,10 +306,9 @@ namespace Microsoft.Maui.Platform
 			}
 		}
 
-		public static void UpdateOpacity(this AView platformView, IView view)
-		{
-			platformView.Alpha = (float)view.Opacity;
-		}
+		public static void UpdateOpacity(this AView platformView, IView view) => platformView.UpdateOpacity(view.Opacity);
+
+		internal static void UpdateOpacity(this AView platformView, double opacity) => platformView.Alpha = (float)opacity;
 
 		public static void UpdateFlowDirection(this AView platformView, IView view)
 		{
@@ -515,28 +545,43 @@ namespace Microsoft.Maui.Platform
 			return frameworkElement.IsAttachedToWindow;
 		}
 
-		internal static IDisposable OnLoaded(this View frameworkElement, Action action)
+		internal static IDisposable OnLoaded(this View view, Action action)
 		{
-			if (frameworkElement.IsLoaded())
+			if (view.IsLoaded())
 			{
 				action();
 				return new ActionDisposable(() => { });
 			}
 
 			EventHandler<AView.ViewAttachedToWindowEventArgs>? routedEventHandler = null;
-			ActionDisposable disposable = new ActionDisposable(() =>
+			ActionDisposable? disposable = new ActionDisposable(() =>
 			{
 				if (routedEventHandler != null)
-					frameworkElement.ViewAttachedToWindow -= routedEventHandler;
+					view.ViewAttachedToWindow -= routedEventHandler;
 			});
 
 			routedEventHandler = (_, __) =>
 			{
-				disposable.Dispose();
+				if (!view.IsLoaded() && Looper.MyLooper() is Looper q)
+				{
+					new Handler(q).Post(() =>
+					{
+						if (disposable is not null)
+							action.Invoke();
+
+						disposable?.Dispose();
+						disposable = null;
+					});
+
+					return;
+				}
+
+				disposable?.Dispose();
+				disposable = null;
 				action();
 			};
 
-			frameworkElement.ViewAttachedToWindow += routedEventHandler;
+			view.ViewAttachedToWindow += routedEventHandler;
 			return disposable;
 		}
 
@@ -549,7 +594,7 @@ namespace Microsoft.Maui.Platform
 			}
 
 			EventHandler<AView.ViewDetachedFromWindowEventArgs>? routedEventHandler = null;
-			ActionDisposable disposable = new ActionDisposable(() =>
+			ActionDisposable? disposable = new ActionDisposable(() =>
 			{
 				if (routedEventHandler != null)
 					view.ViewDetachedFromWindow -= routedEventHandler;
@@ -557,23 +602,24 @@ namespace Microsoft.Maui.Platform
 
 			routedEventHandler = (_, __) =>
 			{
-				disposable.Dispose();
 				// This event seems to fire prior to the view actually being
 				// detached from the window
-				if (view.IsLoaded())
+				if (view.IsLoaded() && Looper.MyLooper() is Looper q)
 				{
-					var q = Looper.MyLooper();
-					if (q != null)
+					new Handler(q).Post(() =>
 					{
-						new Handler(q).Post(() =>
-						{
+						if (disposable is not null)
 							action.Invoke();
-						});
 
-						return;
-					}
+						disposable?.Dispose();
+						disposable = null;
+					});
+
+					return;
 				}
 
+				disposable?.Dispose();
+				disposable = null;
 				action();
 			};
 
@@ -684,6 +730,65 @@ namespace Microsoft.Maui.Platform
 				return null;
 
 			return (element.ToPlatform())?.GetLocationOnScreenPx();
+		}
+
+		internal static bool HideSoftInput(this AView inputView)
+		{
+			using var inputMethodManager = (InputMethodManager?)inputView.Context?.GetSystemService(Context.InputMethodService);
+			var windowToken = inputView.WindowToken;
+
+			if (windowToken is not null && inputMethodManager is not null)
+			{
+				return inputMethodManager.HideSoftInputFromWindow(windowToken, HideSoftInputFlags.None);
+			}
+
+			return false;
+		}
+
+		internal static bool ShowSoftInput(this TextView inputView)
+		{
+			using var inputMethodManager = (InputMethodManager?)inputView.Context?.GetSystemService(Context.InputMethodService);
+
+			// The zero value for the second parameter comes from 
+			// https://developer.android.com/reference/android/view/inputmethod/InputMethodManager#showSoftInput(android.view.View,%20int)
+			// Apparently there's no named value for zero in this case
+			return inputMethodManager?.ShowSoftInput(inputView, 0) is true;
+		}
+
+		internal static bool ShowSoftInput(this AView view) => view switch
+		{
+			TextView textView => textView.ShowSoftInput(),
+			ViewGroup viewGroup => viewGroup.GetFirstChildOfType<TextView>()?.ShowSoftInput() is true,
+			_ => false,
+		};
+
+		internal static bool IsSoftInputShowing(this AView view)
+		{
+			var insets = ViewCompat.GetRootWindowInsets(view);
+			if (insets is null)
+			{
+				return false;
+			}
+
+			var result = insets.IsVisible(WindowInsetsCompat.Type.Ime());
+			return result;
+		}
+
+		internal static void PostShowSoftInput(this AView view)
+		{
+			void ShowSoftInput()
+			{
+				// Since we're posting this on the queue, it's possible something else will have disposed of the view
+				// by the time the looper is running this, so we have to verify that the view is still usable
+				if (view.IsDisposed())
+				{
+					return;
+				}
+
+				view.ShowSoftInput();
+			};
+
+			view.Post(ShowSoftInput);
 		}
 	}
 }

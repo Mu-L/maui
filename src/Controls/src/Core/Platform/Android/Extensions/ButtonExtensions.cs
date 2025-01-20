@@ -36,7 +36,7 @@ namespace Microsoft.Maui.Controls.Platform
 			{
 				var contentLayout = button.ContentLayout;
 
-				// IconPadding calls materialButton.CompoundDrawablePadding				
+				// IconPadding calls materialButton.CompoundDrawablePadding
 				// Which is why we don't have to worry about calling setCompoundDrawablePadding
 				// ourselves for our custom implemented IconGravityBottom
 				materialButton.IconPadding = (int)context.ToPixels(contentLayout.Spacing);
@@ -44,20 +44,15 @@ namespace Microsoft.Maui.Controls.Platform
 				switch (contentLayout.Position)
 				{
 					case ButtonContentLayout.ImagePosition.Top:
-						materialButton.Icon = icon;
 						materialButton.IconGravity = MaterialButton.IconGravityTop;
 						break;
 					case ButtonContentLayout.ImagePosition.Bottom:
-						materialButton.Icon = null;
-						TextViewCompat.SetCompoundDrawablesRelative(materialButton, null, null, null, icon);
 						materialButton.IconGravity = MauiMaterialButton.IconGravityBottom;
 						break;
 					case ButtonContentLayout.ImagePosition.Left:
-						materialButton.Icon = icon;
 						materialButton.IconGravity = MaterialButton.IconGravityTextStart;
 						break;
 					case ButtonContentLayout.ImagePosition.Right:
-						materialButton.Icon = icon;
 						materialButton.IconGravity = MaterialButton.IconGravityTextEnd;
 						break;
 				}

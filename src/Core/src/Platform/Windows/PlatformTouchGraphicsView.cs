@@ -1,4 +1,5 @@
 ﻿using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Graphics.Platform;
 using Microsoft.Maui.Graphics.Win2D;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -9,8 +10,8 @@ namespace Microsoft.Maui.Platform
 	{
 		IGraphicsView? _graphicsView;
 		readonly W2DGraphicsView _platformGraphicsView;
-		bool _isTouching = false;
-		bool _isInBounds = false;
+		bool _isTouching;
+		bool _isInBounds;
 
 		public PlatformTouchGraphicsView()
 		{

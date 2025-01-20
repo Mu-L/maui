@@ -6,8 +6,12 @@ namespace Microsoft.Maui.Handlers
 		public static new IPropertyMapper<IContentView, IPageHandler> Mapper =
 			new PropertyMapper<IContentView, IPageHandler>(ContentViewHandler.Mapper)
 			{
-#if TIZEN
+#if IOS || TIZEN
 				[nameof(IContentView.Background)] = MapBackground,
+#if IOS
+				[nameof(IiOSPageSpecifics.IsHomeIndicatorAutoHidden)] = MapHomeIndicatorAutoHidden,
+				[nameof(IiOSPageSpecifics.PrefersStatusBarHiddenMode)] = MapPrefersStatusBarHiddenMode,
+#endif
 #endif
 				[nameof(ITitledElement.Title)] = MapTitle,
 			};

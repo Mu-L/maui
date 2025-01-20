@@ -7,11 +7,16 @@ using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Handlers;
 using Microsoft.Maui.Controls.Platform;
+using Microsoft.Maui.DeviceTests.Stubs;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Platform;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Xunit;
 using NavigationView = Microsoft.UI.Xaml.Controls.NavigationView;
+using WFrameworkElement = Microsoft.UI.Xaml.FrameworkElement;
+using WNavigationViewItem = Microsoft.UI.Xaml.Controls.NavigationViewItem;
+using static Microsoft.Maui.DeviceTests.AssertHelpers;
 
 
 namespace Microsoft.Maui.DeviceTests
@@ -23,6 +28,76 @@ namespace Microsoft.Maui.DeviceTests
 		{
 			Assert.Equal(desiredState, handler.PlatformView.IsPaneOpen);
 			return Task.CompletedTask;
+		}
+
+		[Fact(DisplayName = "Shell Title Updates Correctly")]
+		public async Task ShellTitleUpdatesCorrectly()
+		{
+			SetupBuilder();
+
+			var page1 = new ContentPage()
+			{ Content = new Label() { Text = "Page 1" }, Title = "Page 1" };
+			var page2 = new ContentPage()
+			{ Content = new Label() { Text = "Page 2" }, Title = "Page 2" };
+
+			var shell = await CreateShellAsync((shell) =>
+			{
+				var tabBar = new TabBar()
+				{
+					Items =
+					{
+						new ShellContent(){ Content = page1 },
+						new ShellContent(){ Content = page2 },
+					}
+				};
+
+				shell.Items.Add(tabBar);
+			});
+
+			await CreateHandlerAndAddToWindow<WindowHandlerStub>(new Controls.Window(shell), (handler) =>
+			{
+				Assert.Equal("Page 1", GetToolbarTitle(handler));
+
+				string newTitle = "New Page 1";
+				page1.Title = newTitle;
+				Assert.Equal(newTitle, GetToolbarTitle(handler));
+			});
+		}
+
+		static bool IsViewLaidOut(object platformView)
+		{
+			var frameworkElement = platformView as WFrameworkElement;
+			return frameworkElement is not null && (frameworkElement.ActualHeight > 0 || frameworkElement.ActualWidth > 0);
+		}
+
+		[Fact(DisplayName = "Shell FlyoutIcon Initializes Correctly")]
+		public async Task ShellFlyoutIconInitializesCorrectly()
+		{
+			SetupBuilder();
+
+			var shell = await CreateShellAsync((shell) =>
+			{
+				shell.FlyoutBehavior = FlyoutBehavior.Flyout;
+				shell.FlyoutIcon = "red.png";
+
+				var shellItem = new FlyoutItem();
+				shellItem.Items.Add(new ContentPage());
+				shell.Items.Add(shellItem);
+			});
+
+			await CreateHandlerAndAddToWindow<ShellHandler>(shell, async (handler) =>
+			{
+				var rootNavView = handler.PlatformView;
+				var shellItemView = shell.CurrentItem.Handler.PlatformView as MauiNavigationView;
+
+				Assert.NotNull(shellItemView);
+
+				await AssertEventually(() => IsViewLaidOut(shell.Handler.PlatformView));
+
+				var animatedIcon = GetNativeAnimatedIcon(handler);
+				Assert.NotNull(animatedIcon);
+				Assert.NotNull(animatedIcon.FallbackIconSource);
+			});
 		}
 
 		[Theory(DisplayName = "Shell FlyoutBackground Initializes Correctly")]
@@ -46,30 +121,21 @@ namespace Microsoft.Maui.DeviceTests
 				shell.Items.Add(shellItem);
 			});
 
-			await InvokeOnMainThreadAsync(async () =>
+			await CreateHandlerAndAddToWindow<ShellHandler>(shell, async (handler) =>
 			{
-				await CreateHandlerAndAddToWindow<ShellHandler>(shell, (handler) =>
-				{
-					var rootNavView = handler.PlatformView;
-					var shellItemView = shell.CurrentItem.Handler.PlatformView as MauiNavigationView;
-					var expectedRoot = UI.Xaml.Controls.NavigationViewPaneDisplayMode.Left;
-					var expectedShellItems = UI.Xaml.Controls.NavigationViewPaneDisplayMode.LeftMinimal;
+				var rootNavView = handler.PlatformView;
+				var shellItemView = shell.CurrentItem.Handler.PlatformView as MauiNavigationView;
+				var expectedRoot = UI.Xaml.Controls.NavigationViewPaneDisplayMode.Left;
+				var expectedShellItems = UI.Xaml.Controls.NavigationViewPaneDisplayMode.LeftMinimal;
 
-					Assert.Equal(expectedRoot, rootNavView.PaneDisplayMode);
-					Assert.NotNull(shellItemView);
-					Assert.Equal(expectedShellItems, shellItemView.PaneDisplayMode);
+				Assert.Equal(expectedRoot, rootNavView.PaneDisplayMode);
+				Assert.NotNull(shellItemView);
+				Assert.Equal(expectedShellItems, shellItemView.PaneDisplayMode);
 
-					return Task.CompletedTask;
-				});
+				await AssertEventually(() => IsViewLaidOut(shell.Handler.PlatformView));
 
-				await AssertionExtensions.Wait(() =>
-				{
-					var platformView = shell.Handler.PlatformView as FrameworkElement;
-					return platformView is not null && (platformView.Height > 0 || platformView.Width > 0);
-				});
+				await ValidateHasColor(shell, expectedColor, typeof(ShellHandler));
 			});
-
-			await ValidateHasColor(shell, expectedColor, typeof(ShellHandler));
 		}
 
 		[Fact(DisplayName = "Back Button Enabled/Disabled")]
@@ -192,7 +258,7 @@ namespace Microsoft.Maui.DeviceTests
 		public async Task FlyoutLockedOffsetFromAppTitleBar()
 		{
 			SetupBuilder();
-			var label = new StackLayout()
+			var label = new Controls.StackLayout()
 			{
 				HeightRequest = 10
 			};
@@ -297,10 +363,12 @@ namespace Microsoft.Maui.DeviceTests
 			var content1 = new ShellContent();
 			content1.Title = "Hello";
 			content1.Route = $"...";
+			content1.Content = new ContentPage();
 
 			var content2 = new ShellContent();
 			content2.Title = "World";
 			content2.Route = $"...";
+			content2.Content = new ContentPage();
 
 			var shell = await CreateShellAsync((shell) =>
 			{
@@ -473,6 +541,31 @@ namespace Microsoft.Maui.DeviceTests
 			});
 		}
 
+		[Fact(DisplayName = "Navigate back and forth doesn't crash")]
+		public async Task NavigateBackAndForthDoesntCrash()
+		{
+			SetupBuilder();
+
+			var shell = await CreateShellAsync(shell =>
+			{
+				shell.CurrentItem = new ContentPage();
+			});
+
+			await CreateHandlerAndAddToWindow<ShellHandler>(shell, async (handler) =>
+			{
+				var secondPage = new ContentPage();
+
+				for (int i = 0; i < 5; i++)
+				{
+					await shell.Navigation.PushAsync(secondPage, false);
+					await Task.Delay(100);
+					await shell.Navigation.PopToRootAsync(false);
+					await Task.Delay(100);
+				}
+				Assert.NotNull(shell.Handler);
+			});
+		}
+
 		[Fact(DisplayName = "Shell Toolbar With Only MenuBarItems Is Visible")]
 		public async Task ShellToolbarWithOnlyMenuBarItemsIsVisible()
 		{
@@ -481,8 +574,8 @@ namespace Microsoft.Maui.DeviceTests
 			var shell = await CreateShellAsync((shell) =>
 			{
 				var contentPage = new ContentPage();
-				var menuFlyoutItem = new MenuFlyoutItem { Text = "Test" };
-				var menuBarItem = new MenuBarItem { Text = "File" };
+				var menuFlyoutItem = new Controls.MenuFlyoutItem { Text = "Test" };
+				var menuBarItem = new Controls.MenuBarItem { Text = "File" };
 				menuBarItem.Add(menuFlyoutItem);
 				contentPage.MenuBarItems.Add(menuBarItem);
 
@@ -529,7 +622,7 @@ namespace Microsoft.Maui.DeviceTests
 
 			await CreateHandlerAndAddToWindow<ShellHandler>(shell, async (handler) =>
 			{
-				Assert.True(await AssertionExtensions.Wait(() => mainPage.ToPlatform().GetLocationOnScreen().Value.Y > 0));
+				await AssertEventually(() => mainPage.ToPlatform().GetLocationOnScreen().Value.Y > 0);
 				var appTitleBarHeight = GetWindowRootView(handler).AppTitleBarActualHeight;
 				var position = mainPage.ToPlatform().GetLocationOnScreen();
 
@@ -653,7 +746,7 @@ namespace Microsoft.Maui.DeviceTests
 				tabbedView.SelectedItem = platformTabItems[1].MenuItemsSource[1];
 
 				// Wait for the selected item to propagate to the rootview
-				await AssertionExtensions.Wait(() => (rootView.SelectedItem as NavigationViewItemViewModel).Data == flyoutItems[0][1]);
+				await AssertEventually(() => (rootView.SelectedItem as NavigationViewItemViewModel).Data == flyoutItems[0][1]);
 
 				// Verify that the flyout item updates
 				Assert.Equal((rootView.SelectedItem as NavigationViewItemViewModel).Data, flyoutItems[0][1]);
@@ -708,6 +801,23 @@ namespace Microsoft.Maui.DeviceTests
 				throw new InvalidOperationException("Unable to locate page inside platform shell components");
 
 			await OnNavigatedToAsync(page);
+		}
+
+		MauiNavigationView GetNavigationView(ShellHandler shellHandler) =>
+			shellHandler.PlatformView;
+
+		AnimatedIcon GetNativeAnimatedIcon(ShellHandler shellHandler)
+		{
+			var mauiNavigationView = GetNavigationView(shellHandler);
+
+			var togglePaneButton = mauiNavigationView.TogglePaneButton;
+
+			if (togglePaneButton is null)
+				return null;
+
+			var animatedIcon = togglePaneButton.GetFirstDescendant<AnimatedIcon>();
+
+			return animatedIcon;
 		}
 	}
 }

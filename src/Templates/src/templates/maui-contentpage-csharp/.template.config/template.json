@@ -6,6 +6,7 @@
     "groupIdentity": "Microsoft.Maui.CSharpContentPage",
     "precedence": "DOTNET_TFM_VERSION_MAJOR_VALUE",
     "name": ".NET MAUI ContentPage (C#)",
+    "description": "A page for displaying content using C#.",
     "shortName": "maui-page-csharp",
     "tags": {
       "language": "C#",
@@ -37,6 +38,10 @@
         "description": "Namespace for the generated code.",
         "replaces": "MauiApp1",
         "type": "parameter"
+      },
+      "HostIdentifier": {
+          "type": "bind",
+          "binding": "HostIdentifier"
       }
     }
   }

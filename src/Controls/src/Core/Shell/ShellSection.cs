@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,8 @@ namespace Microsoft.Maui.Controls
 	/// <include file="../../../docs/Microsoft.Maui.Controls/ShellSection.xml" path="Type[@FullName='Microsoft.Maui.Controls.ShellSection']/Docs/*" />
 	[ContentProperty(nameof(Items))]
 	[EditorBrowsable(EditorBrowsableState.Never)]
-	public partial class ShellSection : ShellGroupItem, IShellSectionController, IPropertyPropagationController, IVisualTreeElement
+	[TypeConverter(typeof(ShellSectionTypeConverter))]
+	public partial class ShellSection : ShellGroupItem, IShellSectionController, IPropertyPropagationController, IVisualTreeElement, IStackNavigation
 	{
 		#region PropertyKeys
 
@@ -56,7 +58,7 @@ namespace Microsoft.Maui.Controls
 					if (Navigation.ModalStack[Navigation.ModalStack.Count - 1] is NavigationPage np)
 						return np.Navigation.NavigationStack[np.Navigation.NavigationStack.Count - 1];
 
-					return Navigation.ModalStack[0];
+					return Navigation.ModalStack[Navigation.ModalStack.Count - 1];
 				}
 
 				if (_navStack.Count > 1)
@@ -194,7 +196,7 @@ namespace Microsoft.Maui.Controls
 		#region IPropertyPropagationController
 		void IPropertyPropagationController.PropagatePropertyChanged(string propertyName)
 		{
-			PropertyPropagationExtensions.PropagatePropertyChanged(propertyName, this, Items);
+			PropertyPropagationExtensions.PropagatePropertyChanged(propertyName, this, ((IVisualTreeElement)this).GetVisualChildren());
 		}
 		#endregion
 
@@ -291,9 +293,9 @@ namespace Microsoft.Maui.Controls
 
 			shellSection.Items.Add(shellContent);
 
-			shellSection.SetBinding(TitleProperty, new Binding(nameof(Title), BindingMode.OneWay, source: shellContent));
-			shellSection.SetBinding(IconProperty, new Binding(nameof(Icon), BindingMode.OneWay, source: shellContent));
-			shellSection.SetBinding(FlyoutIconProperty, new Binding(nameof(FlyoutIcon), BindingMode.OneWay, source: shellContent));
+			shellSection.SetBinding(TitleProperty, static (BaseShellItem item) => item.Title, BindingMode.OneWay, source: shellContent);
+			shellSection.SetBinding(IconProperty, static (BaseShellItem item) => item.Icon, BindingMode.OneWay, source: shellContent);
+			shellSection.SetBinding(FlyoutIconProperty, static (BaseShellItem item) => item.FlyoutIcon, BindingMode.OneWay, source: shellContent);
 
 			return shellSection;
 		}
@@ -648,8 +650,11 @@ namespace Microsoft.Maui.Controls
 			if (previousPage != DisplayedPage)
 			{
 				previousPage?.SendDisappearing();
-				PresentedPageAppearing();
-				SendAppearanceChanged();
+				if (!Navigation.ModalStack.Any())
+				{
+					PresentedPageAppearing();
+					SendAppearanceChanged();
+				}
 			}
 		}
 
@@ -702,7 +707,7 @@ namespace Microsoft.Maui.Controls
 				var contentItems = ShellSectionController.GetItems();
 				if (contentItems.Count == 0)
 				{
-					ClearValue(CurrentItemProperty);
+					ClearValue(CurrentItemProperty, specificity: SetterSpecificity.FromHandler);
 				}
 				else
 				{
@@ -1215,6 +1220,44 @@ namespace Microsoft.Maui.Controls
 			}
 		}
 
-		IReadOnlyList<Maui.IVisualTreeElement> IVisualTreeElement.GetVisualChildren() => AllChildren.ToList();
+#nullable enable
+		// This code only runs for shell bits that are running through a proper
+		// ShellHandler
+		TaskCompletionSource<object>? _handlerBasedNavigationCompletionSource;
+		internal Task? PendingNavigationTask => _handlerBasedNavigationCompletionSource?.Task;
+
+		void IStackNavigation.RequestNavigation(NavigationRequest eventArgs)
+		{
+			if (_handlerBasedNavigationCompletionSource != null)
+				throw new InvalidOperationException("Pending Navigations still processing");
+
+			_handlerBasedNavigationCompletionSource = new TaskCompletionSource<object>();
+			Handler.Invoke(nameof(IStackNavigation.RequestNavigation), eventArgs);
+		}
+
+		void IStackNavigation.NavigationFinished(IReadOnlyList<IView> newStack)
+		{
+			_ = _handlerBasedNavigationCompletionSource ?? throw new InvalidOperationException("Mismatched Navigation finished");
+			var source = _handlerBasedNavigationCompletionSource;
+			_handlerBasedNavigationCompletionSource = null;
+			source?.SetResult(true);
+		}
+#nullable disable
+
+		private sealed class ShellSectionTypeConverter : TypeConverter
+		{
+			public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType) => false;
+			public override object ConvertTo(ITypeDescriptorContext context, CultureInfo cultureInfo, object value, Type destinationType) => throw new NotSupportedException();
+
+			public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+				=> sourceType == typeof(ShellContent) || sourceType == typeof(TemplatedPage);
+			public override object ConvertFrom(ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value)
+				=> value switch
+				{
+					ShellContent shellContent => (ShellSection)shellContent,
+					TemplatedPage page => (ShellSection)page,
+					_ => throw new NotSupportedException(),
+				};
+		}
 	}
 }

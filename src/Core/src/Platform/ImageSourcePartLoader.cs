@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using Microsoft.Maui.Handlers;
 
@@ -23,28 +24,31 @@ namespace Microsoft.Maui.Platform
 {
 	public partial class ImageSourcePartLoader
 	{
+#if IOS || ANDROID || WINDOWS || TIZEN
 		IImageSourceServiceProvider? _imageSourceServiceProvider;
-		IImageSourceServiceProvider ImageSourceServiceProvider =>
-			_imageSourceServiceProvider ??= Handler.GetRequiredService<IImageSourceServiceProvider>();
+#endif
 
-		readonly Func<IImageSourcePart?> _imageSourcePart;
-		Action<PlatformImage?>? SetImage { get; }
-		PlatformView? PlatformView => Handler.PlatformView as PlatformView;
+#if ANDROID
+		// This is a temporary workaround for Android so that images don't just keep vanishing
+		// We will have a better fix in the next release that's better integrated with Glide
+		internal bool CheckForImageLoadedOnAttached { get; set; }
+#endif
+
+		readonly IImageSourcePartSetter _setter;
 
 		internal ImageSourceServiceResultManager SourceManager { get; } = new ImageSourceServiceResultManager();
 
-		IElementHandler Handler { get; }
-
-		public ImageSourcePartLoader(
-			IElementHandler handler,
-			Func<IImageSourcePart?> imageSourcePart,
-			Action<PlatformImage?> setImage)
+		[EditorBrowsable(EditorBrowsableState.Never)]
+		[Obsolete("Use ImageSourcePartLoader(IImageSourcePartSetter setter) instead.", true)]
+		public ImageSourcePartLoader(IElementHandler handler, Func<IImageSourcePart?> imageSourcePart, Action<PlatformImage?> setImage)
+			: this((IImageSourcePartSetter)handler)
 		{
-			Handler = handler;
-			_imageSourcePart = imageSourcePart;
-
-			SetImage = setImage;
 		}
+
+		public ImageSourcePartLoader(IImageSourcePartSetter setter) =>
+			_setter = setter;
+
+		internal IImageSourcePartSetter Setter => _setter;
 
 		public void Reset()
 		{
@@ -53,28 +57,43 @@ namespace Microsoft.Maui.Platform
 
 		public async Task UpdateImageSourceAsync()
 		{
-			if (PlatformView is null)
+			if (Setter.Handler is not IElementHandler handler || handler.PlatformView is not PlatformView platformView)
 			{
 				return;
 			}
 
-			var token = this.SourceManager.BeginLoad();
-			var imageSource = _imageSourcePart();
+			var token = SourceManager.BeginLoad();
+			var imageSource = Setter.ImageSourcePart;
 
 			if (imageSource?.Source is not null)
 			{
-#if __IOS__ || __ANDROID__ || WINDOWS || TIZEN
-				var result = await imageSource.UpdateSourceAsync(PlatformView, ImageSourceServiceProvider, SetImage!, token)
+#if IOS || ANDROID || WINDOWS || TIZEN
+				_imageSourceServiceProvider ??= handler.GetRequiredService<IImageSourceServiceProvider>();
+#endif
+
+#if IOS || WINDOWS
+				var scale = handler.MauiContext?.GetOptionalPlatformWindow()?.GetDisplayDensity() ?? 1.0f;
+				var result = await imageSource.UpdateSourceAsync(platformView, _imageSourceServiceProvider, Setter.SetImageSource, scale, token)
 					.ConfigureAwait(false);
 
 				SourceManager.CompleteLoad(result);
+#elif ANDROID || TIZEN
+				var result = await imageSource.UpdateSourceAsync(platformView, _imageSourceServiceProvider, Setter.SetImageSource, token)
+					.ConfigureAwait(false);
 #else
 				await Task.CompletedTask;
+#endif
+
+#if ANDROID
+				CheckForImageLoadedOnAttached = true;
 #endif
 			}
 			else
 			{
-				SetImage?.Invoke(null);
+				Setter.SetImageSource(null);
+#if ANDROID
+				CheckForImageLoadedOnAttached = false;
+#endif
 			}
 		}
 	}

@@ -37,7 +37,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			const string path = "Foo.Bar";
 			var binding = new Binding(path);
 			var be = new BindingExpression(binding, path);
-			be.Apply(null, new MockBindable(), TextCell.TextProperty);
+			be.Apply(null, new MockBindable(), TextCell.TextProperty, SetterSpecificity.FromBinding);
 		}
 
 		// We only throw on invalid path features, if they give an invalid property
@@ -139,7 +139,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		public void TryConvertWithNumbersAndCultures(object inputString, CultureInfo culture, object expected)
 		{
 			CultureInfo.CurrentCulture = culture;
-			BindingExpression.TryConvert(ref inputString, Entry.TextProperty, expected.GetType(), false);
+			BindingExpressionHelper.TryConvert(ref inputString, Entry.TextProperty, expected.GetType(), false);
 
 			Assert.Equal(expected, inputString);
 		}

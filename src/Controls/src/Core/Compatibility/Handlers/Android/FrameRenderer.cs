@@ -14,6 +14,7 @@ using Color = Microsoft.Maui.Graphics.Color;
 
 namespace Microsoft.Maui.Controls.Handlers.Compatibility
 {
+	[Obsolete("Frame is obsolete as of .NET 9. Please use Border instead.")]
 	public class FrameRenderer : CardView, IPlatformViewHandler
 	{
 		public static IPropertyMapper<Frame, FrameRenderer> Mapper
@@ -131,7 +132,6 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 				{
 					var child = GetChildAt(0);
 					child?.RemoveFromParent();
-					child?.Dispose();
 				}
 
 				Element?.Handler?.DisconnectHandler();
@@ -158,11 +158,11 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 		protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
 		{
 			if (Element?.Handler is IPlatformViewHandler pvh &&
-				Element is IContentView cv &&
+				Element is ICrossPlatformLayout cpl &&
 				VirtualView is not null &&
 				Context is not null)
 			{
-				var measure = pvh.MeasureVirtualView(widthMeasureSpec, heightMeasureSpec, cv.CrossPlatformMeasure);
+				var measure = pvh.MeasureVirtualView(widthMeasureSpec, heightMeasureSpec, cpl.CrossPlatformMeasure);
 				SetMeasuredDimension((int)measure.Width, (int)measure.Height);
 			}
 			else
@@ -176,7 +176,7 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 
 
 			if (Element.Handler is IPlatformViewHandler pvh &&
-				Element is IContentView cv)
+				Element is ICrossPlatformLayout cv)
 			{
 				pvh.LayoutVirtualView(l, t, r, b, cv.CrossPlatformArrange);
 			}
@@ -197,6 +197,7 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 
 		public override void Draw(Canvas? canvas)
 		{
+			ArgumentNullException.ThrowIfNull(canvas);
 			Controls.Compatibility.Platform.Android.CanvasExtensions.ClipShape(canvas, Context, Element);
 
 			base.Draw(canvas);
@@ -271,6 +272,8 @@ namespace Microsoft.Maui.Controls.Handlers.Compatibility
 					_backgroundDrawable = new GradientDrawable();
 					_backgroundDrawable.SetShape(ShapeType.Rectangle);
 					this.SetBackground(_backgroundDrawable);
+					UpdateBorderColor();
+					UpdateCornerRadius();
 				}
 
 				UpdateBackgroundColor();

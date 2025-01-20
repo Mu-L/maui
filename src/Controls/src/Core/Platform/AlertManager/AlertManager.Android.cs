@@ -39,9 +39,11 @@ namespace Microsoft.Maui.Controls.Platform
 
 		internal void Unsubscribe(Window window)
 		{
-			IMauiContext mauiContext = window?.MauiContext;
+			IMauiContext mauiContext = window?.Handler?.MauiContext;
 			Context context = mauiContext?.Context;
-			Activity activity = context.GetActivity();
+			Activity activity = context?.GetActivity();
+			if (activity == null)
+				return;
 
 			var toRemove = Subscriptions.Where(s => s.Activity == activity).ToList();
 
@@ -95,7 +97,7 @@ namespace Microsoft.Maui.Controls.Platform
 			void OnPageBusy(IView sender, bool enabled)
 			{
 				// Verify that the page making the request is part of this activity 
-				if (!PageIsInThisContext(sender))
+				if (!PageIsInThisContext(sender) && enabled)
 				{
 					return;
 				}

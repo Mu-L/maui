@@ -1,4 +1,6 @@
-﻿using Microsoft.Maui.Graphics;
+﻿using System;
+using System.Transactions;
+using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
 using NSubstitute;
 using Xunit;
@@ -41,8 +43,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests.Layouts
 			root.Add(flexLayout);
 			flexLayout.Add(image as IView);
 
-			var manager = new FlexLayoutManager(flexLayout);
-			_ = manager.Measure(1000, 1000);
+			flexLayout.CrossPlatformMeasure(1000, 1000);
 
 			Assert.True(image.Passed, "Image should be measured unconstrained even if the FlexLayout is constrained.");
 		}
@@ -59,11 +60,9 @@ namespace Microsoft.Maui.Controls.Core.UnitTests.Layouts
 			flexLayout.Add(view as IView);
 			flexLayout.Add(view2 as IView);
 
-			var manager = new FlexLayoutManager(flexLayout);
-
 			// Measure and arrange the layout while the first view is visible
-			var measure = manager.Measure(1000, 1000);
-			manager.ArrangeChildren(new Rect(Point.Zero, measure));
+			var measure = flexLayout.CrossPlatformMeasure(1000, 1000);
+			flexLayout.CrossPlatformArrange(new Rect(Point.Zero, measure));
 
 			// Keep track of where the second view is arranged
 			var whenVisible = view2.Frame.X;
@@ -71,9 +70,9 @@ namespace Microsoft.Maui.Controls.Core.UnitTests.Layouts
 			// Change the visibility
 			view.IsVisible = false;
 
-			// Measure and arrange againg
-			measure = manager.Measure(1000, 1000);
-			manager.ArrangeChildren(new Rect(Point.Zero, measure));
+			// Measure and arrange again
+			measure = flexLayout.CrossPlatformMeasure(1000, 1000);
+			flexLayout.CrossPlatformArrange(new Rect(Point.Zero, measure));
 
 			var whenInvisible = view2.Frame.X;
 
@@ -91,10 +90,14 @@ namespace Microsoft.Maui.Controls.Core.UnitTests.Layouts
 		 * depending on the target platform.
 		 */
 
-		(IFlexLayout, IView) SetUpUnconstrainedTest()
+		(IFlexLayout, IView) SetUpUnconstrainedTest(Action<FlexLayout> configure = null)
 		{
 			var root = new Grid(); // FlexLayout requires a parent, at least for now
-			var flexLayout = new FlexLayout() as IFlexLayout;
+
+			var controlsFlexLayout = new FlexLayout();
+			configure?.Invoke(controlsFlexLayout);
+
+			var flexLayout = controlsFlexLayout as IFlexLayout;
 
 			var view = Substitute.For<IView>();
 			var size = new Size(100, 100);
@@ -128,6 +131,92 @@ namespace Microsoft.Maui.Controls.Core.UnitTests.Layouts
 			var flexFrame = flexLayout.GetFlexFrame(view);
 
 			Assert.Equal(100, flexFrame.Width);
+		}
+
+		[Fact]
+		public void FlexLayoutPaddingShouldBeAppliedCorrectly_RowDirection()
+		{
+			// Arrange
+			var padding = 16;
+			var root = new Grid();
+			var flexLayout = new FlexLayout { Padding = padding };
+			var view1 = new TestLabel();
+			var view2 = new TestLabel();
+
+			root.Add(flexLayout);
+			flexLayout.Add(view1 as IView);
+			flexLayout.Add(view2 as IView);
+
+			// Act
+			var measure = flexLayout.CrossPlatformMeasure(1000, 1000);
+			flexLayout.CrossPlatformArrange(new Rect(Point.Zero, measure));
+
+			var view1Frame = flexLayout.Children[0].Frame;
+			var view2Frame = flexLayout.Children[1].Frame;
+
+			var leftPadding = view1Frame.X;
+			var topPadding = view1Frame.Y;
+			var rightPadding = measure.Width - view2Frame.Right;
+			var expectedView1Width = measure.Width - (leftPadding + rightPadding + view2.Width);
+			var expectedView2Width = measure.Width - (leftPadding + rightPadding + view1.Width);
+
+			// Assert
+			Assert.Equal(padding, leftPadding);
+			Assert.Equal(padding, rightPadding);
+			Assert.Equal(padding, topPadding);
+			Assert.Equal(expectedView1Width, view1Frame.Width);
+			Assert.Equal(expectedView2Width, view2Frame.Width);
+		}
+
+		[Fact]
+		public void FlexLayoutPaddingShouldBeAppliedCorrectly_ColumnDirection()
+		{
+			// Arrange
+			var padding = 16;
+			var root = new Grid();
+			var flexLayout = new FlexLayout { Padding = padding, Direction = FlexDirection.Column };
+			var view1 = new TestLabel();
+			var view2 = new TestLabel();
+
+			root.Add(flexLayout);
+			flexLayout.Add(view1 as IView);
+			flexLayout.Add(view2 as IView);
+
+			// Act
+			var measure = flexLayout.CrossPlatformMeasure(1000, 1000);
+			flexLayout.CrossPlatformArrange(new Rect(Point.Zero, measure));
+
+			var view1Frame = flexLayout.Children[0].Frame;
+			var view2Frame = flexLayout.Children[1].Frame;
+
+			var bottomPadding = measure.Height - view2Frame.Bottom;
+			var topPadding = view1Frame.Y;
+			var expectedView1Height = measure.Height - (topPadding + bottomPadding + view2.Height);
+			var expectedView2Height = measure.Height - (topPadding + bottomPadding + view1.Height);
+
+			// Assert
+			Assert.Equal(padding, bottomPadding);
+			Assert.Equal(view2.Height, view2Frame.Height);
+			Assert.Equal(expectedView1Height, view1Frame.Height);
+			Assert.Equal(expectedView2Height, view2Frame.Height);
+		}
+
+		[Theory]
+		[InlineData(double.PositiveInfinity, 400, FlexDirection.RowReverse)]
+		[InlineData(double.PositiveInfinity, 400, FlexDirection.Row)]
+		[InlineData(400, double.PositiveInfinity, FlexDirection.ColumnReverse)]
+		[InlineData(400, double.PositiveInfinity, FlexDirection.Column)]
+		public void UnconstrainedMeasureHonorsFlexDirection(double widthConstraint, double heightConstraint,
+			FlexDirection flexDirection)
+		{
+			(var flexLayout, var view) = SetUpUnconstrainedTest((fl) => { fl.Direction = flexDirection; });
+
+			_ = flexLayout.CrossPlatformMeasure(widthConstraint, heightConstraint);
+
+			var flexFrame = flexLayout.GetFlexFrame(view);
+
+			Assert.Equal(0, flexFrame.X);
+			Assert.Equal(0, flexFrame.Y);
 		}
 	}
 }

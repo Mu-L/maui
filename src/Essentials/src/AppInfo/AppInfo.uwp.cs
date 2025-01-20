@@ -18,7 +18,7 @@ namespace Microsoft.Maui.ApplicationModel
 		readonly ActiveWindowTracker _activeWindowTracker;
 
 		/// <summary>
-		/// Intializes a new <see cref="AppInfoImplementation"/> object with default values.
+		/// Initializes a new <see cref="AppInfoImplementation"/> object with default values.
 		/// </summary>
 		public AppInfoImplementation()
 		{
@@ -34,8 +34,7 @@ namespace Microsoft.Maui.ApplicationModel
 			? Package.Current.Id.Name
 			: _launchingAssembly.GetAppInfoValue("PackageName") ?? _launchingAssembly.GetCustomAttribute<AssemblyTitleAttribute>()?.Title ?? string.Empty;
 
-		// TODO: NET8 add this as a actual data point and public property if it is valid on platforms
-		internal static string PublisherName => AppInfoUtils.IsPackagedApp
+		public static string PublisherName => AppInfoUtils.IsPackagedApp
 			? Package.Current.PublisherDisplayName
 			: _launchingAssembly.GetAppInfoValue("PublisherName") ?? _launchingAssembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company ?? string.Empty;
 
@@ -114,6 +113,18 @@ namespace Microsoft.Maui.ApplicationModel
 		/// Gets if this app is a packaged app.
 		/// </summary>
 		public static bool IsPackagedApp => _isPackagedAppLazy.Value;
+
+		static readonly Lazy<string> platformGetFullAppPackageFilePath = new Lazy<string>(() =>
+		{
+			return IsPackagedApp
+				? Package.Current.InstalledLocation.Path
+				: AppContext.BaseDirectory;
+		});
+
+		/// <summary>
+		/// Gets full application path.
+		/// </summary>
+		public static string PlatformGetFullAppPackageFilePath => platformGetFullAppPackageFilePath.Value;
 
 		/// <summary>
 		/// Converts a <see cref="PackageVersion"/> object to a <see cref="Version"/> object.

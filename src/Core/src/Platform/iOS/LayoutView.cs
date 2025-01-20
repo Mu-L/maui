@@ -1,7 +1,4 @@
-using System;
-using System.Drawing;
 using CoreGraphics;
-using Microsoft.Maui.Graphics;
 using UIKit;
 
 namespace Microsoft.Maui.Platform
@@ -10,85 +7,44 @@ namespace Microsoft.Maui.Platform
 	{
 		bool _userInteractionEnabled;
 
-
-		// TODO: Possibly reconcile this code with ViewHandlerExtensions.MeasureVirtualView
-		// If you make changes here please review if those changes should also
-		// apply to ViewHandlerExtensions.MeasureVirtualView
-		public override CGSize SizeThatFits(CGSize size)
-		{
-			if (View is not ILayout layout)
-			{
-				return base.SizeThatFits(size);
-			}
-
-			var width = size.Width;
-			var height = size.Height;
-
-			var crossPlatformSize = layout.CrossPlatformMeasure(width, height);
-
-			CacheMeasureConstraints(width, height);
-
-			return crossPlatformSize.ToCGSize();
-		}
-
-		// TODO: Possibly reconcile this code with ViewHandlerExtensions.LayoutVirtualView
-		// If you make changes here please review if those changes should also
-		// apply to ViewHandlerExtensions.LayoutVirtualView
-		public override void LayoutSubviews()
-		{
-			base.LayoutSubviews();
-
-			if (View is not ILayout layout)
-			{
-				return;
-			}
-
-			var bounds = AdjustForSafeArea(Bounds).ToRectangle();
-
-			var widthConstraint = bounds.Width;
-			var heightConstraint = bounds.Height;
-
-			if (!IsMeasureValid(widthConstraint, heightConstraint))
-			{
-				layout.CrossPlatformMeasure(widthConstraint, heightConstraint);
-				CacheMeasureConstraints(widthConstraint, heightConstraint);
-			}
-
-			layout.CrossPlatformArrange(bounds);
-		}
-
-		public override void SetNeedsLayout()
-		{
-			InvalidateConstraintsCache();
-			base.SetNeedsLayout();
-			Superview?.SetNeedsLayout();
-		}
-
 		public override void SubviewAdded(UIView uiview)
 		{
 			InvalidateConstraintsCache();
 			base.SubviewAdded(uiview);
-			Superview?.SetNeedsLayout();
+			TryToInvalidateSuperView(false);
 		}
 
 		public override void WillRemoveSubview(UIView uiview)
 		{
 			InvalidateConstraintsCache();
 			base.WillRemoveSubview(uiview);
-			Superview?.SetNeedsLayout();
+			TryToInvalidateSuperView(false);
 		}
 
-		public override UIView HitTest(CGPoint point, UIEvent? uievent)
+		public override UIView? HitTest(CGPoint point, UIEvent? uievent)
 		{
 			var result = base.HitTest(point, uievent);
 
-			if (!_userInteractionEnabled && this.Equals(result))
+			if (result is null)
+			{
+				return null;
+			}
+
+			if (!_userInteractionEnabled && Equals(result))
 			{
 				// If user interaction is disabled (IOW, if the corresponding Layout is InputTransparent),
 				// then we exclude the LayoutView itself from hit testing. But it's children are valid
 				// hit testing targets.
 
-				return null!;
+				return null;
+			}
+
+			if (result is LayoutView layoutView && !layoutView.UserInteractionEnabledOverride)
+			{
+				// If the child is a layout then we need to check the UserInteractionEnabledOverride
+				// since layouts always have user interaction enabled.
+
+				return null;
 			}
 
 			return result;

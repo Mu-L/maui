@@ -33,6 +33,32 @@ namespace Microsoft.Maui.IntegrationTests
 			}
 		}
 
+		static string? _logDirectory = null;
+		public static string GetLogDirectory()
+		{
+			if (_logDirectory == null)
+			{
+				var artifactsStaging = Environment.GetEnvironmentVariable("BUILD_ARTIFACTSTAGINGDIRECTORY");
+				var envLogDirectory = Environment.GetEnvironmentVariable("LogDirectory");
+				if (envLogDirectory != null)
+				{
+					_logDirectory = envLogDirectory;
+				}
+				else
+				{
+					if (artifactsStaging != null)
+					{
+						_logDirectory = artifactsStaging;
+					}
+					else
+					{
+						_logDirectory = GetTestDirectoryRoot();
+					}
+				}
+			}
+			return $"{_logDirectory}/logs";
+		}
+
 		static string _testOutputDirectory = "";
 		public static string GetTestDirectoryRoot()
 		{
@@ -43,11 +69,11 @@ namespace Microsoft.Maui.IntegrationTests
 			var rootDir = Environment.GetEnvironmentVariable("AGENT_TEMPDIRECTORY");
 			if (Directory.Exists(rootDir))
 			{
-				_testOutputDirectory = Path.Combine(rootDir, $"test-intg");
+				_testOutputDirectory = Path.Combine(rootDir, $"test-dir");
 			}
 			else
 			{
-				_testOutputDirectory = Path.Combine(GetMauiDirectory(), "bin", "test-intg");
+				_testOutputDirectory = Path.Combine(GetMauiDirectory(), "bin", "test-dir");
 			}
 
 			Directory.CreateDirectory(_testOutputDirectory);
@@ -62,7 +88,7 @@ namespace Microsoft.Maui.IntegrationTests
 			if (string.IsNullOrEmpty(sdkPath))
 				sdkPath = IsWindows
 					? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Android", "android-sdk")
-					: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Developer", "Xamarin", "android-sdk-macosx");
+					: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Android", "sdk");
 
 			return sdkPath;
 		}

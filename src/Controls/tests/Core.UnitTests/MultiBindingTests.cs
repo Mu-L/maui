@@ -8,12 +8,12 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Controls.Internals;
 using Xunit;
 
 namespace Microsoft.Maui.Controls.Core.UnitTests
 {
 	using Grid = Microsoft.Maui.Controls.Compatibility.Grid;
-
 
 	public class MultiBindingTests : BaseTestFixture
 	{
@@ -51,7 +51,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.Equal(oldName, label.Text);
 			Assert.Equal(oldName, group.Person1.FullName);
 
-			label.SetValueCore(Label.TextProperty, $"{oldFirstName.ToUpperInvariant()} {oldMiddleName} {oldLastName.ToUpperInvariant()}", Internals.SetValueFlags.None);
+			label.SetValueCore(Label.TextProperty, $"{oldFirstName.ToUpperInvariant()} {oldMiddleName} {oldLastName.ToUpperInvariant()}", Internals.SetValueFlags.None, BindableObject.SetValuePrivateFlags.Default, SetterSpecificity.ManualValueSetter);
 			Assert.Equal($"{oldFirstName} {oldMiddleName} {oldLastName.ToUpperInvariant()}", group.Person1.FullName);
 		}
 
@@ -79,7 +79,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.Equal("Courier New 12 Italic", entry1.Text);
 			// Our unit test's ConvertBack should throw an exception below because the desired
 			// return types aren't all strings
-			Assert.Throws<Exception>(() => entry1.SetValueCore(Entry.TextProperty, "Arial 12 Italic", Internals.SetValueFlags.None));
+			Assert.Throws<Exception>(() => entry1.SetValueCore(Entry.TextProperty, "Arial 12 Italic", Internals.SetValueFlags.None, BindableObject.SetValuePrivateFlags.None, SetterSpecificity.ManualValueSetter));
 
 			// FindAncestor and FindAncestorBindingContext
 			// are already tested in TestNestedMultiBindings
@@ -87,6 +87,55 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 			// TemplatedParent
 			var templ = new ControlTemplate(typeof(ExpanderControlTemplate));
+			var expander = new ExpanderControl
+			{
+				ControlTemplate = templ,
+				Content = new Label { Text = "Content" },
+				IsEnabled = true,
+				IsExpanded = true
+			};
+			var cp = expander.Children[0].LogicalChildrenInternal[1] as ContentPresenter;
+			Assert.True(cp.IsVisible);
+			expander.IsEnabled = false;
+			Assert.False(cp.IsVisible);
+			expander.IsEnabled = true;
+			Assert.True(cp.IsVisible);
+			expander.IsExpanded = false;
+			Assert.False(cp.IsVisible);
+		}
+
+		[Fact]
+		public void TestRelativeSources_TypedBinding()
+		{
+			// Self
+			var entry1 = new Entry()
+			{
+				FontFamily = "Courier New",
+				FontSize = 12,
+				FontAttributes = FontAttributes.Italic
+			};
+			entry1.SetBinding(Entry.TextProperty,
+				new MultiBinding
+				{
+					Bindings = new Collection<BindingBase>
+					{
+						Binding.Create(static (Entry entry) => entry.FontFamily, source: RelativeBindingSource.Self),
+						Binding.Create(static (Entry entry) => entry.FontSize, source: RelativeBindingSource.Self),
+						Binding.Create(static (Entry entry) => entry.FontAttributes, source: RelativeBindingSource.Self),
+					},
+					Converter = new StringConcatenationConverter()
+				});
+			Assert.Equal("Courier New 12 Italic", entry1.Text);
+			// Our unit test's ConvertBack should throw an exception below because the desired
+			// return types aren't all strings
+			Assert.Throws<Exception>(() => entry1.SetValueCore(Entry.TextProperty, "Arial 12 Italic", Internals.SetValueFlags.None, BindableObject.SetValuePrivateFlags.None, SetterSpecificity.ManualValueSetter));
+
+			// FindAncestor and FindAncestorBindingContext
+			// are already tested in TestNestedMultiBindings
+			TestNestedMultiBindings();
+
+			// TemplatedParent
+			var templ = new ControlTemplate(typeof(ExpanderControlTemplate_TypedBinding));
 			var expander = new ExpanderControl
 			{
 				ControlTemplate = templ,
@@ -177,6 +226,73 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		}
 
 		[Fact]
+		public void TestNestedMultiBindings_TypedBinding()
+		{
+			var group = new GroupViewModel();
+			var stack = new StackLayout
+			{
+				BindingContext = group
+			};
+
+			var checkBox = new CheckBox();
+			checkBox.SetBinding(
+				CheckBox.IsCheckedProperty,
+				new MultiBinding
+				{
+					Bindings = {
+						new MultiBinding {
+							Bindings = {
+								Binding.Create(static (PersonViewModel vm) => vm.IsOver16),
+								Binding.Create(static (PersonViewModel vm) => vm.HasPassedTest),
+								Binding.Create(static (PersonViewModel vm) => vm.IsSuspended, converter: new Inverter()),
+								Binding.Create(static (GroupViewModel vm) => vm.SuspendAll, converter: new Inverter(),
+									source: new RelativeBindingSource(RelativeBindingSourceMode.FindAncestorBindingContext, ancestorType: typeof(GroupViewModel))),
+							},
+							Converter = new AllTrueMultiConverter()
+						},
+						Binding.Create(static (PersonViewModel vm) => vm.IsMonarch),
+						Binding.Create(static (StackLayout stack) => ((GroupViewModel)stack.BindingContext).PardonAllSuspensions,
+							source: new RelativeBindingSource(RelativeBindingSourceMode.FindAncestor, typeof(StackLayout))),
+					},
+					Converter = new AnyTrueMultiConverter(),
+					FallbackValue = "false", //use a string literal here to test xaml conversion
+				});
+
+			// ^^
+			// CanDrive = (IsOver16 && HasPassedTest && !IsSuspended && !Group.SuspendAll) || IsMonarch || Group.PardonAllSuspensions
+
+			checkBox.BindingContext = group.Person5;
+			stack.Children.Add(checkBox);
+
+			// Monarch can do whatever she wants
+			Assert.True(checkBox.IsChecked);
+
+			// ... Until being deposed after a coup
+			group.Person5.IsMonarch = false;
+			Assert.False(checkBox.IsChecked);
+
+			// After passing test she can drive again
+			group.Person5.HasPassedTest = true;
+			Assert.True(checkBox.IsChecked);
+
+			// Martial law declared; no one can drive
+			group.SuspendAll = true;
+			Assert.False(checkBox.IsChecked);
+
+			// Martial law is over
+			group.SuspendAll = false;
+			Assert.True(checkBox.IsChecked);
+
+			// But she got in an accident and now can't drive again
+			group.Person5.IsSuspended = true;
+			Assert.False(checkBox.IsChecked);
+
+			// The new PM has pardoned everyone after the end of the rebellion
+			group.PardonAllSuspensions = true;
+			Assert.True(checkBox.IsChecked);
+		}
+
+		[Fact]
 		public void TestConverterReturnValues()
 		{
 			var group = new GroupViewModel();
@@ -212,7 +328,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 			var label2 = GenerateNameLabel(nameof(group.Person2), BindingMode.TwoWay);
 			stack.Children.Add(label2);
-			label2.SetValueCore(Label.TextProperty, $"DoNothing {oldMiddleName} {oldLastName.ToUpperInvariant()}", Internals.SetValueFlags.None);
+			label2.SetValueCore(Label.TextProperty, $"DoNothing {oldMiddleName} {oldLastName.ToUpperInvariant()}", Internals.SetValueFlags.None, BindableObject.SetValuePrivateFlags.None, specificity: SetterSpecificity.ManualValueSetter);
 			Assert.Equal($"{oldFirstName} {oldMiddleName} {oldLastName.ToUpperInvariant()}", group.Person2.FullName);
 			Assert.Equal($"DoNothing {oldMiddleName} {oldLastName.ToUpperInvariant()}", label2.Text);
 
@@ -220,14 +336,14 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.Equal(oldName, group.Person2.FullName);
 			Assert.Equal(oldName, label2.Text);
 			// Any UnsetValue prevents any changes to source but target accepts value
-			label2.SetValueCore(Label.TextProperty, $"{oldFirstName.ToUpperInvariant()} UnsetValue {oldLastName}");
+			label2.SetValue(Label.TextProperty, $"{oldFirstName.ToUpperInvariant()} UnsetValue {oldLastName}");
 			Assert.Equal($"{oldFirstName.ToUpperInvariant()} {oldMiddleName} {oldLastName}", group.Person2.FullName);
 			Assert.Equal($"{oldFirstName.ToUpperInvariant()} UnsetValue {oldLastName}", label2.Text);
 
 			label2.Text = oldName;
 			Assert.Equal(oldName, group.Person2.FullName);
 			Assert.Equal(oldName, label2.Text);
-			label2.SetValueCore(Label.TextProperty, "null");
+			label2.SetValue(Label.TextProperty, "null");
 			// Returning null prevents changes to source but target accepts value
 			Assert.Equal(oldName, group.Person2.FullName);
 			Assert.Equal("null", label2.Text);
@@ -236,14 +352,14 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			label2.Text = oldName;
 			Assert.Equal(oldName, group.Person2.FullName);
 			Assert.Equal(oldName, label2.Text);
-			label2.SetValueCore(Label.TextProperty, $"Duck Duck", Internals.SetValueFlags.None);
+			label2.SetValueCore(Label.TextProperty, $"Duck Duck", Internals.SetValueFlags.None, BindableObject.SetValuePrivateFlags.None, SetterSpecificity.ManualValueSetter);
 			Assert.Equal($"Duck Duck {oldLastName}", group.Person2.FullName);
 			Assert.Equal($"Duck Duck", label2.Text);
 
 			// Too many members are no problem either 
 			label2.Text = oldName;
 			Assert.Equal(oldName, group.Person2.FullName);
-			label2.SetValueCore(Label.TextProperty, oldName + " Extra", Internals.SetValueFlags.None);
+			label2.SetValueCore(Label.TextProperty, oldName + " Extra", Internals.SetValueFlags.None, BindableObject.SetValuePrivateFlags.None, SetterSpecificity.ManualValueSetter);
 			Assert.Equal(oldName, group.Person2.FullName);
 			Assert.Equal(oldName + " Extra", label2.Text);
 		}
@@ -872,6 +988,36 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 					Bindings = {
 						new Binding(nameof(ExpanderControl.IsEnabled), source: RelativeBindingSource.TemplatedParent),
 						new Binding(nameof(ExpanderControl.IsExpanded), source: RelativeBindingSource.TemplatedParent)
+					},
+					Converter = new AllTrueMultiConverter(),
+					FallbackValue = false
+				});
+				this.Children.Add(cp);
+			}
+		}
+
+		public class ExpanderControlTemplate_TypedBinding : Grid
+		{
+			public ExpanderControlTemplate_TypedBinding()
+			{
+				this.RowDefinitions = new RowDefinitionCollection
+				{
+					new RowDefinition { Height = new GridLength(0, GridUnitType.Auto)},
+					new RowDefinition { Height = new GridLength(1, GridUnitType.Star)}
+				};
+
+				var expander = new Button { Text = "^" };
+				Grid.SetRow(expander, 0);
+				this.Children.Add(expander);
+
+				var cp = new ContentPresenter();
+				Grid.SetRow(cp, 1);
+				cp.SetBinding(ContentPresenter.ContentProperty, static (ExpanderControl c) => c.Content, source: RelativeBindingSource.TemplatedParent);
+				cp.SetBinding(ContentPresenter.IsVisibleProperty, new MultiBinding
+				{
+					Bindings = {
+						Binding.Create(static (ExpanderControl c) => c.IsEnabled, source: RelativeBindingSource.TemplatedParent),
+						Binding.Create(static (ExpanderControl c) => c.IsExpanded, source: RelativeBindingSource.TemplatedParent),
 					},
 					Converter = new AllTrueMultiConverter(),
 					FallbackValue = false

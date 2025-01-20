@@ -1,11 +1,13 @@
 #nullable disable
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Microsoft.Maui.Controls
 {
 	/// <include file="../../docs/Microsoft.Maui.Controls/TemplateBinding.xml" path="Type[@FullName='Microsoft.Maui.Controls.TemplateBinding']/Docs/*" />
 	[Obsolete("Use Binding.Source=RelativeBindingSource.TemplatedParent")]
+	[RequiresUnreferencedCode(TrimmerConstants.StringPathBindingWarning, Url = TrimmerConstants.ExpressionBasedBindingsDocsUrl)]
 	public sealed class TemplateBinding : BindingBase
 	{
 		internal const string SelfPath = ".";
@@ -24,9 +26,9 @@ namespace Microsoft.Maui.Controls
 		public TemplateBinding(string path, BindingMode mode = BindingMode.Default, IValueConverter converter = null, object converterParameter = null, string stringFormat = null)
 		{
 			if (path == null)
-				throw new ArgumentNullException("path");
+				throw new ArgumentNullException(nameof(path));
 			if (string.IsNullOrWhiteSpace(path))
-				throw new ArgumentException("path cannot be an empty string", "path");
+				throw new ArgumentException("path cannot be an empty string", nameof(path));
 
 			AllowChaining = true;
 			Path = path;
@@ -83,13 +85,13 @@ namespace Microsoft.Maui.Controls
 			_expression.Apply(fromTarget);
 		}
 
-		internal override async void Apply(object newContext, BindableObject bindObj, BindableProperty targetProperty, bool fromBindingContextChanged = false)
+		internal override async void Apply(object newContext, BindableObject bindObj, BindableProperty targetProperty, bool fromBindingContextChanged, SetterSpecificity specificity)
 		{
 			var view = bindObj as Element;
 			if (view == null)
 				throw new InvalidOperationException();
 
-			base.Apply(newContext, bindObj, targetProperty, fromBindingContextChanged);
+			base.Apply(newContext, bindObj, targetProperty, fromBindingContextChanged, specificity);
 
 			Element templatedParent = await TemplateUtilities.FindTemplatedParentAsync(view);
 			ApplyInner(templatedParent, bindObj, targetProperty);
@@ -97,7 +99,12 @@ namespace Microsoft.Maui.Controls
 
 		internal override BindingBase Clone()
 		{
-			return new TemplateBinding(Path, Mode) { Converter = Converter, ConverterParameter = ConverterParameter, StringFormat = StringFormat };
+			var clone = new TemplateBinding(Path, Mode) { Converter = Converter, ConverterParameter = ConverterParameter, StringFormat = StringFormat };
+
+			if (VisualDiagnostics.IsEnabled && VisualDiagnostics.GetSourceInfo(this) is SourceInfo info)
+				VisualDiagnostics.RegisterSourceInfo(clone, info.SourceUri, info.LineNumber, info.LinePosition);
+
+			return clone;
 		}
 
 		internal override object GetSourceValue(object value, Type targetPropertyType)
@@ -129,7 +136,7 @@ namespace Microsoft.Maui.Controls
 			if (_expression == null && templatedParent != null)
 				_expression = new BindingExpression(this, SelfPath);
 
-			_expression?.Apply(templatedParent, bindableObject, targetProperty);
+			_expression?.Apply(templatedParent, bindableObject, targetProperty, SetterSpecificity.FromBinding);
 		}
 
 		BindingExpression GetBindingExpression(string path)

@@ -23,11 +23,11 @@ namespace Microsoft.Maui.Controls
 
 		/// <summary>Bindable property for <see cref="IsEnabled"/>.</summary>
 		public static readonly BindableProperty IsEnabledProperty =
-			BindableProperty.Create(nameof(IsEnabled), typeof(bool), typeof(BackButtonBehavior), true, BindingMode.OneTime);
+			BindableProperty.Create(nameof(IsEnabled), typeof(bool), typeof(BackButtonBehavior), true, BindingMode.OneWay);
 
 		/// <summary>Bindable property for <see cref="IsVisible"/>.</summary>
 		public static readonly BindableProperty IsVisibleProperty =
-			BindableProperty.Create(nameof(IsVisible), typeof(bool), typeof(BackButtonBehavior), true, BindingMode.OneTime);
+			BindableProperty.Create(nameof(IsVisible), typeof(bool), typeof(BackButtonBehavior), true, BindingMode.OneWay);
 
 		/// <summary>Bindable property for <see cref="TextOverride"/>.</summary>
 		public static readonly BindableProperty TextOverrideProperty =
@@ -74,7 +74,7 @@ namespace Microsoft.Maui.Controls
 			set { SetValue(TextOverrideProperty, value); }
 		}
 
-		bool IsEnabledCore { set => SetValueCore(IsEnabledProperty, value); }
+		bool IsEnabledCore { set => SetValue(IsEnabledProperty, value); }
 
 		static void OnCommandChanged(BindableObject bindable, object oldValue, object newValue)
 		{

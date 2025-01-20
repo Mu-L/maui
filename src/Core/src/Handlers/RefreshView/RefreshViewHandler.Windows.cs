@@ -14,20 +14,17 @@ namespace Microsoft.Maui.Handlers
 
 		protected override RefreshContainer CreatePlatformView()
 		{
-			var refreshContainer = new RefreshContainer
+			return new RefreshContainer
 			{
-				ManipulationMode = UI.Xaml.Input.ManipulationModes.All,
-				PullDirection = RefreshPullDirection.TopToBottom
+				PullDirection = RefreshPullDirection.TopToBottom,
+				Content = new ContentPanel()
 			};
-
-			return refreshContainer;
 		}
 
 		protected override void ConnectHandler(RefreshContainer nativeView)
 		{
 			nativeView.Loaded += OnLoaded;
 			nativeView.RefreshRequested += OnRefresh;
-			nativeView.ManipulationDelta += OnManipulationDelta;
 
 			base.ConnectHandler(nativeView);
 		}
@@ -36,9 +33,14 @@ namespace Microsoft.Maui.Handlers
 		{
 			nativeView.Loaded -= OnLoaded;
 			nativeView.RefreshRequested -= OnRefresh;
-			nativeView.ManipulationDelta += OnManipulationDelta;
 
 			CompleteRefresh();
+
+			if (nativeView.Content is ContentPanel contentPanel)
+			{
+				contentPanel.Content = null;
+				contentPanel.CrossPlatformLayout = null;
+			}
 
 			base.DisconnectHandler(nativeView);
 		}
@@ -68,8 +70,27 @@ namespace Microsoft.Maui.Handlers
 
 		static void UpdateContent(IRefreshViewHandler handler)
 		{
-			handler.PlatformView.Content =
-				handler.VirtualView.Content?.ToPlatform(handler.MauiContext!);
+			IView? content;
+
+			if (handler.VirtualView is IContentView cv && cv.PresentedContent is IView view)
+			{
+				content = view;
+			}
+			else
+			{
+				content = handler.VirtualView.Content;
+			}
+
+			var platformContent = content?.ToPlatform(handler.MauiContext!);
+			if (handler.PlatformView.Content is ContentPanel contentPanel)
+			{
+				contentPanel.Content = platformContent;
+				contentPanel.CrossPlatformLayout = (handler.VirtualView as ICrossPlatformLayout);
+			}
+			else
+			{
+				handler.PlatformView.Content = platformContent;
+			}
 		}
 
 		static void UpdateRefreshColor(IRefreshViewHandler handler)
@@ -116,18 +137,6 @@ namespace Microsoft.Maui.Handlers
 			_refreshCompletionDeferral = args.GetDeferral();
 
 			if (VirtualView != null)
-				VirtualView.IsRefreshing = true;
-		}
-
-		void OnManipulationDelta(object sender, UI.Xaml.Input.ManipulationDeltaRoutedEventArgs e)
-		{
-			if (e.PointerDeviceType is UI.Input.PointerDeviceType.Touch)
-				return; // Already managed by the RefreshContainer control itself
-
-			const double minimumCumulativeY = 20;
-			double cumulativeY = e.Cumulative.Translation.Y;
-
-			if (cumulativeY > minimumCumulativeY && VirtualView is not null && !VirtualView.IsRefreshing)
 				VirtualView.IsRefreshing = true;
 		}
 

@@ -2,7 +2,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Microsoft.Maui.Controls.Internals;
 
 namespace Microsoft.Maui.Controls
 {
@@ -13,9 +12,7 @@ namespace Microsoft.Maui.Controls
 
 		internal TriggerBase(Type targetType)
 		{
-			if (targetType == null)
-				throw new ArgumentNullException("targetType");
-			TargetType = targetType;
+			TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
 
 			EnterActions = new SealedList<TriggerAction>();
 			ExitActions = new SealedList<TriggerAction>();
@@ -62,7 +59,7 @@ namespace Microsoft.Maui.Controls
 			IsSealed = true;
 
 			if (bindable == null)
-				throw new ArgumentNullException("bindable");
+				throw new ArgumentNullException(nameof(bindable));
 			if (!TargetType.IsInstanceOfType(bindable))
 				throw new InvalidOperationException("bindable not an instance of AssociatedType");
 			OnAttachedTo(bindable);
@@ -71,20 +68,30 @@ namespace Microsoft.Maui.Controls
 		void IAttachedObject.DetachFrom(BindableObject bindable)
 		{
 			if (bindable == null)
-				throw new ArgumentNullException("bindable");
+				throw new ArgumentNullException(nameof(bindable));
 			OnDetachingFrom(bindable);
 		}
 
 		internal virtual void OnAttachedTo(BindableObject bindable)
 		{
 			if (Condition != null)
+			{
+				var triggerIndex = ++bindable._triggerCount;
+				var manualSpecificity = (ushort)(SetterSpecificity.ManualTriggerBaseline + triggerIndex);
+				var specificity = new SetterSpecificity(0, manualSpecificity, 0, 0, 0, 0, 0, 0);
+
+				bindable._triggerSpecificity[this] = specificity;
 				Condition.SetUp(bindable);
+			}
 		}
 
 		internal virtual void OnDetachingFrom(BindableObject bindable)
 		{
 			if (Condition != null)
+			{
 				Condition.TearDown(bindable);
+				bindable._triggerSpecificity.Remove(this);
+			}
 		}
 
 		internal virtual void OnSeal()
@@ -99,17 +106,23 @@ namespace Microsoft.Maui.Controls
 
 		void OnConditionChanged(BindableObject bindable, bool oldValue, bool newValue)
 		{
+			if (!bindable._triggerSpecificity.TryGetValue(this, out var specificity))
+			{
+				// this should never happen
+				return;
+			}
+
 			if (newValue)
 			{
 				foreach (TriggerAction action in EnterActions)
 					action.DoInvoke(bindable);
 				foreach (Setter setter in Setters)
-					setter.Apply(bindable);
+					setter.Apply(bindable, specificity);
 			}
 			else
 			{
 				foreach (Setter setter in Setters)
-					setter.UnApply(bindable);
+					setter.UnApply(bindable, specificity);
 				foreach (TriggerAction action in ExitActions)
 					action.DoInvoke(bindable);
 			}
