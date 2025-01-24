@@ -145,7 +145,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var bo = new MockBindable { BindingContext = vm };
 			bo.SetBinding(property, binding);
 
-			bo.SetValue(property, "Baz");
+			bo.SetValue(property, "Baz", SetterSpecificity.FromHandler);
 
 			Assert.Equal("Baz", vm.Text);
 			Assert.Equal("Foo Baz", bo.GetValue(property));
@@ -696,9 +696,9 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		{
 			Assert.Throws<ArgumentNullException>(() => BindingBase.EnableCollectionSynchronization(null, new object(),
 			   (collection, context, method, access) => { }));
-			Assert.Throws<ArgumentNullException>(() => BindingBase.EnableCollectionSynchronization(new string[0], new object(), null));
+			Assert.Throws<ArgumentNullException>(() => BindingBase.EnableCollectionSynchronization(Array.Empty<string>(), new object(), null));
 
-			BindingBase.EnableCollectionSynchronization(new string[0], null, (collection, context, method, access) => { });
+			BindingBase.EnableCollectionSynchronization(Array.Empty<string>(), null, (collection, context, method, access) => { });
 		}
 
 		[Fact]

@@ -24,9 +24,11 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void TestDynamicResourceOverride()
 		{
-			Application.Current.Resources = new ResourceDictionary();
-			Application.Current.Resources.Add("GreenColor", Colors.Green);
-			Application.Current.Resources.Add("RedColor", Colors.Red);
+			Application.Current.Resources = new ResourceDictionary
+			{
+				{ "GreenColor", Colors.Green },
+				{ "RedColor", Colors.Red }
+			};
 
 			var setter = new Setter()
 			{
@@ -105,8 +107,9 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var label = new Label();
 			label.SetDynamicResource(Label.TextProperty, "foo");
 			Assert.Equal(Label.TextProperty.DefaultValue, label.Text);
-			label.Resources = new ResourceDictionary();
-			label.Resources.Add("foo", "FOO");
+			label.Resources = new ResourceDictionary {
+				{ "foo", "FOO" }
+			};
 			Assert.Equal("FOO", label.Text);
 		}
 
@@ -124,8 +127,10 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ValueChangedTriggeredOnSubscribeIfKeyAlreadyExists()
 		{
-			var label = new Label();
-			label.Resources = new ResourceDictionary { { "foo", "FOO" } };
+			var label = new Label
+			{
+				Resources = new ResourceDictionary { { "foo", "FOO" } }
+			};
 			Assert.Equal(Label.TextProperty.DefaultValue, label.Text);
 			label.SetDynamicResource(Label.TextProperty, "foo");
 			Assert.Equal("FOO", label.Text);
@@ -134,8 +139,10 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void RemoveDynamicResourceStopsUpdating()
 		{
-			var label = new Label();
-			label.Resources = new ResourceDictionary { { "foo", "FOO" } };
+			var label = new Label
+			{
+				Resources = new ResourceDictionary { { "foo", "FOO" } }
+			};
 			Assert.Equal(Label.TextProperty.DefaultValue, label.Text);
 			label.SetDynamicResource(Label.TextProperty, "foo");
 			Assert.Equal("FOO", label.Text);

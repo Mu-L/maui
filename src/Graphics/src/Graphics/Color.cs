@@ -102,16 +102,10 @@ namespace Microsoft.Maui.Graphics
 		public override bool Equals(object obj)
 		{
 			if (obj is Color other)
-				return NearlyEqual(Red, other.Red)
-					&& NearlyEqual(Green, other.Green)
-					&& NearlyEqual(Blue, other.Blue)
-					&& NearlyEqual(Alpha, other.Alpha);
+				return ToInt() == other.ToInt();
 
 			return base.Equals(obj);
 		}
-
-		static bool NearlyEqual(float f1, float f2, float epsilon = 0.01f)
-			=> Math.Abs(f1 - f2) < epsilon;
 
 		[Obsolete("Use ToArgbHex instead.")]
 		public string ToHex(bool includeAlpha)
@@ -762,9 +756,7 @@ namespace Microsoft.Maui.Graphics
 			int charsWritten = value.ToLowerInvariant(loweredValue);
 			Debug.Assert(charsWritten == value.Length);
 
-			// this should use the C# feature https://github.com/dotnet/csharplang/issues/1881, when it is available
-			// for now, we need to allocate the lowered string
-			return loweredValue.ToString() switch
+			return loweredValue switch
 			{
 				"default" => default,
 				"aliceblue" => Colors.AliceBlue,

@@ -357,6 +357,32 @@ namespace Microsoft.Maui.ApplicationModel
 				new (string, bool)[] { (Manifest.Permission.RecordAudio, true) };
 		}
 
+		public partial class NearbyWifiDevices : BasePlatformPermission
+		{
+			public override (string androidPermission, bool isRuntime)[] RequiredPermissions
+			{
+				get
+				{
+					var permissions = new List<(string, bool)>();
+					// When targeting Android 12 or lower, AccessFineLocation is required for several WiFi APIs.
+					// For Android 13 and above, it is optional.
+					if (Application.Context.ApplicationInfo.TargetSdkVersion < BuildVersionCodes.Tiramisu || IsDeclaredInManifest(Manifest.Permission.AccessFineLocation))
+						permissions.Add((Manifest.Permission.AccessFineLocation, true));
+
+#if __ANDROID_33__
+					if (OperatingSystem.IsAndroidVersionAtLeast(33) && Application.Context.ApplicationInfo.TargetSdkVersion >= BuildVersionCodes.Tiramisu)
+					{
+						// new runtime permission on Android 13
+						if (IsDeclaredInManifest(Manifest.Permission.NearbyWifiDevices))
+							permissions.Add((Manifest.Permission.NearbyWifiDevices, true));
+					}
+#endif
+
+					return permissions.ToArray();
+				}
+			}
+		}
+
 		public partial class NetworkState : BasePlatformPermission
 		{
 			public override (string androidPermission, bool isRuntime)[] RequiredPermissions
@@ -429,6 +455,28 @@ namespace Microsoft.Maui.ApplicationModel
 		{
 		}
 
+		public partial class PostNotifications : BasePlatformPermission
+		{
+			public override (string androidPermission, bool isRuntime)[] RequiredPermissions
+			{
+				get
+				{
+					var permissions = new List<(string, bool)>();
+
+#if __ANDROID_33__
+					if (OperatingSystem.IsAndroidVersionAtLeast(33) && Application.Context.ApplicationInfo.TargetSdkVersion >= BuildVersionCodes.Tiramisu)
+					{
+						// new runtime permissions on Android 12
+						if (IsDeclaredInManifest(Manifest.Permission.PostNotifications))
+							permissions.Add((Manifest.Permission.PostNotifications, true));
+					}
+#endif
+
+					return permissions.ToArray();
+				}
+			}
+		}
+
 		public partial class Reminders : BasePlatformPermission
 		{
 		}
@@ -457,6 +505,8 @@ namespace Microsoft.Maui.ApplicationModel
 						permissions.Add((Manifest.Permission.ReceiveWapPush, true));
 					if (IsDeclaredInManifest(Manifest.Permission.ReceiveMms))
 						permissions.Add((Manifest.Permission.ReceiveMms, true));
+					if (IsDeclaredInManifest(Manifest.Permission.ReceiveSms))
+						permissions.Add((Manifest.Permission.ReceiveSms, true));
 
 					return permissions.ToArray();
 				}
@@ -471,14 +521,75 @@ namespace Microsoft.Maui.ApplicationModel
 
 		public partial class StorageRead : BasePlatformPermission
 		{
-			public override (string androidPermission, bool isRuntime)[] RequiredPermissions =>
-				new (string, bool)[] { (Manifest.Permission.ReadExternalStorage, true) };
+			public override (string androidPermission, bool isRuntime)[] RequiredPermissions
+			{
+				get
+				{
+					if (OperatingSystem.IsAndroidVersionAtLeast(33))
+					{
+						return [];
+					}
+
+					return new (string, bool)[] { (Manifest.Permission.ReadExternalStorage, true) };
+				}
+			}
+
+			public override Task<PermissionStatus> RequestAsync()
+			{
+				if (OperatingSystem.IsAndroidVersionAtLeast(33))
+				{
+					return Task.FromResult(PermissionStatus.Granted);
+				}
+
+				return base.RequestAsync();
+			}
+
+			public override Task<PermissionStatus> CheckStatusAsync()
+			{
+				if (OperatingSystem.IsAndroidVersionAtLeast(33))
+				{
+					return Task.FromResult(PermissionStatus.Granted);
+				}
+
+				return base.CheckStatusAsync();
+			}
 		}
 
 		public partial class StorageWrite : BasePlatformPermission
 		{
-			public override (string androidPermission, bool isRuntime)[] RequiredPermissions =>
-				new (string, bool)[] { (Manifest.Permission.WriteExternalStorage, true) };
+			public override (string androidPermission, bool isRuntime)[] RequiredPermissions
+			{
+
+				get
+				{
+					if (OperatingSystem.IsAndroidVersionAtLeast(33))
+					{
+						return [];
+					}
+
+					return new (string, bool)[] { (Manifest.Permission.WriteExternalStorage, true) };
+				}
+			}
+
+			public override Task<PermissionStatus> RequestAsync()
+			{
+				if (OperatingSystem.IsAndroidVersionAtLeast(33))
+				{
+					return Task.FromResult(PermissionStatus.Granted);
+				}
+
+				return base.RequestAsync();
+			}
+
+			public override Task<PermissionStatus> CheckStatusAsync()
+			{
+				if (OperatingSystem.IsAndroidVersionAtLeast(33))
+				{
+					return Task.FromResult(PermissionStatus.Granted);
+				}
+
+				return base.CheckStatusAsync();
+			}
 		}
 
 		public partial class Vibrate : BasePlatformPermission

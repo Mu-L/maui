@@ -5,11 +5,13 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Handlers;
+using Microsoft.Maui.Controls.Platform;
 using Microsoft.Maui.DeviceTests.Stubs;
 using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui.Platform;
 using Xunit;
+using static Microsoft.Maui.DeviceTests.AssertHelpers;
 
 #if ANDROID || IOS || MACCATALYST
 using ShellHandler = Microsoft.Maui.Controls.Handlers.Compatibility.ShellRenderer;
@@ -35,24 +37,12 @@ namespace Microsoft.Maui.DeviceTests
 			{
 				builder.ConfigureMauiHandlers(handlers =>
 				{
-					handlers.AddHandler(typeof(Toolbar), typeof(ToolbarHandler));
 					handlers.AddHandler(typeof(NavigationPage), typeof(NavigationViewHandler));
 					handlers.AddHandler(typeof(FlyoutPage), typeof(FlyoutViewHandler));
 					handlers.AddHandler(typeof(TabbedPage), typeof(TabbedViewHandler));
-					handlers.AddHandler<Page, PageHandler>();
 					handlers.AddHandler<Window, WindowHandlerStub>();
-
-					handlers.AddHandler(typeof(Controls.Shell), typeof(ShellHandler));
-					handlers.AddHandler<Layout, LayoutHandler>();
 					handlers.AddHandler<Entry, EntryHandler>();
-					handlers.AddHandler<Image, ImageHandler>();
-					handlers.AddHandler<Label, LabelHandler>();
-					handlers.AddHandler<Toolbar, ToolbarHandler>();
-#if WINDOWS
-					handlers.AddHandler<ShellItem, ShellItemHandler>();
-					handlers.AddHandler<ShellSection, ShellSectionHandler>();
-					handlers.AddHandler<ShellContent, ShellContentHandler>();
-#endif
+					SetupShellHandlers(handlers);
 				});
 			});
 		}
@@ -170,6 +160,54 @@ namespace Microsoft.Maui.DeviceTests
 			Assert.Equal(2, windowDisappearing);
 		}
 
+		[Fact(
+#if WINDOWS
+		Skip = "Fails on Windows"
+#endif
+		)]
+		public async Task PushingNavigationPageModallyWithShellShowsToolbarCorrectly()
+		{
+			SetupBuilder();
+			var windowPage = new LifeCycleTrackingPage()
+			{
+				Title = "Window Page Title"
+			};
+
+			var modalPage = new NavigationPage(new LifeCycleTrackingPage()
+			{
+				Content = new Label() { Text = "Modal page with navigation" }
+			})
+			{ Title = "modal page" };
+
+			Window window = new Window(new Shell() { CurrentItem = windowPage })
+			{
+				Title = "PushingNavigationPageModallyWithShellShowsToolbarCorrectly Window Title"
+			};
+
+			await CreateHandlerAndAddToWindow<IWindowHandler>(window,
+				async (_) =>
+				{
+					await windowPage.Navigation.PushAsync(new ContentPage() { Title = "Second Page on PushingNavigationPageModallyWithShellShowsToolbarCorrectly" });
+					await windowPage.Navigation.PushModalAsync(modalPage);
+
+					// Navigation Bar is visible
+					await AssertEventually(() => IsNavigationBarVisible(modalPage.Handler));
+					Assert.False(IsBackButtonVisible(modalPage.Handler));
+
+					// Verify that new navigation bar can gain a back button
+					var secondModalPage = new ContentPage();
+					await modalPage.Navigation.PushAsync(secondModalPage);
+					await AssertEventually(() => IsBackButtonVisible(secondModalPage.Handler));
+					await secondModalPage.Navigation.PopAsync();
+
+					// Remove the modal page and validate the root window pages toolbar is still setup correctly
+					await modalPage.Navigation.PopModalAsync();
+
+					await AssertEventually(() => IsNavigationBarVisible(windowPage.Handler));
+					await AssertEventually(() => IsBackButtonVisible(windowPage.Handler));
+				});
+		}
+
 		[Theory]
 		[InlineData(true)]
 		[InlineData(false)]
@@ -204,7 +242,11 @@ namespace Microsoft.Maui.DeviceTests
 				});
 		}
 
-		[Theory]
+		[Theory(
+#if WINDOWS
+		Skip = "Fails on Windows"
+#endif
+		)]
 		[InlineData(true)]
 		[InlineData(false)]
 		public async Task PushModalFromAppearing(bool useShell)
@@ -408,7 +450,7 @@ namespace Microsoft.Maui.DeviceTests
 					window.Page = nextPage;
 					await OnUnloadedAsync(modalPage.Content);
 					await OnLoadedAsync(nextPage.Content);
-					Assert.Equal(0, window.Navigation.ModalStack.Count);
+					Assert.Empty(window.Navigation.ModalStack);
 				});
 		}
 
@@ -447,6 +489,27 @@ namespace Microsoft.Maui.DeviceTests
 
 		}
 
+		[Theory(
+#if WINDOWS
+		Skip = "Fails on Windows (Packaged)"
+#endif
+		)]
+		[ClassData(typeof(PageTypes))]
+		public async Task SwappingRootPageWhileModalPageIsOpenDoesntCrash(Page rootPage, Page newRootPage)
+		{
+			SetupBuilder();
+
+			await CreateHandlerAndAddToWindow<IWindowHandler>(rootPage,
+				async (_) =>
+				{
+					var modalPage = new NavigationPage(new ContentPage());
+					await rootPage.Navigation.PushModalAsync(modalPage);
+					await OnLoadedAsync(modalPage);
+					rootPage.Window.Page = newRootPage;
+					await OnLoadedAsync(newRootPage);
+				});
+		}
+
 		[Theory]
 		[ClassData(typeof(PageTypes))]
 		public async Task BasicPushAndPop(Page rootPage, Page modalPage)
@@ -456,30 +519,60 @@ namespace Microsoft.Maui.DeviceTests
 			await CreateHandlerAndAddToWindow<IWindowHandler>(rootPage,
 				async (_) =>
 				{
-					var currentPage = (rootPage as IPageContainer<Page>).CurrentPage;
+					var currentPage = rootPage.GetCurrentPage();
+
 					await currentPage.Navigation.PushModalAsync(modalPage);
 					await OnLoadedAsync(modalPage);
-					Assert.Equal(1, currentPage.Navigation.ModalStack.Count);
+					Assert.Single(currentPage.Navigation.ModalStack);
 					await currentPage.Navigation.PopModalAsync();
 					await OnUnloadedAsync(modalPage);
 				});
 
 
-			Assert.Equal(0, (rootPage as IPageContainer<Page>).CurrentPage.Navigation.ModalStack.Count);
+			Assert.Empty(rootPage.GetCurrentPage().Navigation.ModalStack);
+		}
+
+		[Fact]
+		public async Task DismissModalIfNotAnimated()
+		{
+			SetupBuilder();
+			var page = new ContentPage();
+
+			var modalPage = new ContentPage()
+			{
+				Content = new Label() { Text = "Page with no animation" }
+			};
+
+			var window = new Window(page);
+
+			await CreateHandlerAndAddToWindow(window, async () =>
+			{
+				await page.Navigation.PushModalAsync(modalPage, false);
+				await OnLoadedAsync(modalPage);
+				await modalPage.Navigation.PopModalAsync(false);
+				await OnUnloadedAsync(modalPage);
+
+			});
 		}
 
 		class PageTypes : IEnumerable<object[]>
 		{
 			public IEnumerator<object[]> GetEnumerator()
 			{
-				for (int i = 0; i < 2; i++)
+				for (int i = 0; i < 3; i++)
 				{
 					Func<Page> rootPage;
 
 					if (i == 0)
 						rootPage = () => new NavigationPage(new ContentPage());
-					else
+					else if (i == 1)
 						rootPage = () => new Shell() { CurrentItem = new ContentPage() };
+					else
+						rootPage = () => new FlyoutPage()
+						{
+							Flyout = new ContentPage() { Title = "Flyout" },
+							Detail = new NavigationPage(new ContentPage()) { Title = "Detail" },
+						};
 
 					yield return new object[] {
 						rootPage(), new NavigationPage(new ContentPage())

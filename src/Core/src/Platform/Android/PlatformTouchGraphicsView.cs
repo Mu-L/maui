@@ -13,9 +13,9 @@ namespace Microsoft.Maui.Platform
 		IGraphicsView? _graphicsView;
 		RectF _bounds;
 		bool _dragStarted;
-		PointF[] _lastMovedViewPoints = new PointF[0];
+		PointF[] _lastMovedViewPoints = Array.Empty<PointF>();
 		float _scale = 1;
-		bool _pressedContained = false;
+		bool _pressedContained;
 
 		public PlatformTouchGraphicsView(Context context) : base(context)
 		{
@@ -82,7 +82,7 @@ namespace Microsoft.Maui.Platform
 					float deltaX = _lastMovedViewPoints[0].X - points[0].X;
 					float deltaY = _lastMovedViewPoints[0].Y - points[0].Y;
 
-					if (Math.Abs(deltaX) <= 3 && Math.Abs(deltaY) <= 3)
+					if (MathF.Abs(deltaX) <= 3 && MathF.Abs(deltaY) <= 3)
 						return;
 				}
 			}

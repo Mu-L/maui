@@ -51,12 +51,7 @@ namespace Microsoft.Maui.DeviceTests.Stubs
 
 		void InvokeWindowCreated()
 		{
-			if (Window is not null)
-			{
-				if (!Window.IsCreated)
-					_window.Created();
-			}
-			else
+			if (Window is null && _window is not null)
 			{
 				_window.Created();
 			}
@@ -118,6 +113,11 @@ namespace Microsoft.Maui.DeviceTests.Stubs
 
 		public void OpenWindow(IWindow window)
 		{
+			throw new NotImplementedException();
+		}
+
+		public void ActivateWindow(IWindow window) 
+		{ 
 			throw new NotImplementedException();
 		}
 

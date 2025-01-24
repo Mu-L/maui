@@ -90,7 +90,9 @@ namespace Microsoft.Maui.DeviceTests
 				var primaryCommand = menu.GetItem(i);
 				Assert.Equal(toolbarItem.Text, $"{primaryCommand.TitleFormatted}");
 
+#pragma warning disable XAOBS001 // Obsolete
 				if (primaryCommand is MenuItemImpl menuItemImpl)
+#pragma warning restore XAOBS001 // Obsolete
 				{
 					if (toolbarItem.Order != ToolbarItemOrder.Secondary)
 					{
@@ -123,6 +125,11 @@ namespace Microsoft.Maui.DeviceTests
 
 		protected MaterialToolbar GetPlatformToolbar(IElementHandler handler)
 		{
+			if (handler.VirtualView is VisualElement e)
+			{
+				handler = e.Window?.Handler ?? handler;
+			}
+
 			if (handler is IWindowHandler wh)
 			{
 				handler = wh.VirtualView.Content.Handler;
@@ -154,15 +161,30 @@ namespace Microsoft.Maui.DeviceTests
 		protected MaterialToolbar GetPlatformToolbar(IMauiContext mauiContext)
 		{
 			var navManager = mauiContext.GetNavigationRootManager();
+			if (navManager?.RootView is null)
+				return null;
+
 			var appbarLayout =
-				navManager?.RootView?.FindViewById<AViewGroup>(Resource.Id.navigationlayout_appbar);
+				navManager.RootView.FindViewById<AViewGroup>(Resource.Id.navigationlayout_appbar);
+
+			if (appbarLayout is null &&
+				navManager.RootView is ContainerView cv &&
+				cv.CurrentView is Shell shell)
+			{
+				if (shell.Handler is Controls.Platform.Compatibility.IShellContext sr)
+				{
+					var layout = sr.CurrentDrawerLayout;
+					var content = layout?.GetFirstChildOfType<Controls.Platform.Compatibility.CustomFrameLayout>();
+					appbarLayout = content?.GetFirstChildOfType<AppBarLayout>();
+				}
+			}
 
 			var toolBar = appbarLayout?.GetFirstChildOfType<MaterialToolbar>();
 
 			toolBar = toolBar ?? navManager.ToolbarElement?.Toolbar?.Handler?.PlatformView as
 				MaterialToolbar;
 
-			if (toolBar == null)
+			if (toolBar is null)
 			{
 				appbarLayout =
 					(navManager?.RootView as AViewGroup)?.GetFirstChildOfType<AppBarLayout>();
@@ -226,7 +248,9 @@ namespace Microsoft.Maui.DeviceTests
 				FakeActivityRootView = new FakeActivityRootView(ScopedMauiContext.Context);
 				FakeActivityRootView.LayoutParameters = new LinearLayoutCompat.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent);
 				FakeActivityRootView.AddView(handler.PlatformViewUnderTest);
+#pragma warning disable XAOBS001 // Obsolete
 				handler.PlatformViewUnderTest.LayoutParameters = new FitWindowsFrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent);
+#pragma warning restore XAOBS001 // Obsolete
 
 				if (_window is Window window)
 				{
@@ -264,7 +288,9 @@ namespace Microsoft.Maui.DeviceTests
 			}
 		}
 
+#pragma warning disable XAOBS001 // Obsolete
 		public class FakeActivityRootView : FitWindowsFrameLayout
+#pragma warning restore XAOBS001 // Obsolete
 		{
 			public FakeActivityRootView(Context context) : base(context)
 			{

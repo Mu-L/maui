@@ -2,10 +2,12 @@
 using System;
 using System.Collections;
 using System.Collections.Specialized;
+using System.Linq;
 using Microsoft.Maui.Controls.Platform;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
+using Windows.Foundation;
 using WApp = Microsoft.UI.Xaml.Application;
 using WDataTemplate = Microsoft.UI.Xaml.DataTemplate;
 using WScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility;
@@ -21,6 +23,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 		ScrollViewer _scrollViewer;
 		WScrollBarVisibility? _horizontalScrollBarVisibilityWithoutLoop;
 		WScrollBarVisibility? _verticalScrollBarVisibilityWithoutLoop;
+		Size _currentSize; 
+		bool _isCarouselViewReady;
+		NotifyCollectionChangedEventHandler _collectionChanged;
+		readonly WeakNotifyCollectionChangedProxy _proxy = new();
+
+		~CarouselViewHandler() => _proxy.Unsubscribe();
 
 		protected override IItemsLayout Layout { get; }
 
@@ -30,7 +38,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 		protected override void ConnectHandler(ListViewBase platformView)
 		{
 			ItemsView.Scrolled += CarouselScrolled;
-			ListViewBase.SizeChanged += InitialSetup;
+			platformView.SizeChanged += OnListViewSizeChanged;
 
 			UpdateScrollBarVisibilityForLoop();
 
@@ -42,19 +50,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			if (ItemsView != null)
 				ItemsView.Scrolled -= CarouselScrolled;
 
-			if (ListViewBase != null)
+			if (platformView != null)
 			{
-				ListViewBase.SizeChanged -= InitialSetup;
-
-				if (CollectionViewSource?.Source is ObservableItemTemplateCollection observableItemsSource)
-					observableItemsSource.CollectionChanged -= OnCollectionItemsSourceChanged;
+				platformView.SizeChanged -= OnListViewSizeChanged;
+				_proxy.Unsubscribe();
 			}
 
 			if (_scrollViewer != null)
 			{
 				_scrollViewer.ViewChanging -= OnScrollViewChanging;
 				_scrollViewer.ViewChanged -= OnScrollViewChanged;
-				_scrollViewer.SizeChanged -= InitialSetup;
+				_scrollViewer.SizeChanged -= OnScrollViewSizeChanged;
 			}
 
 			base.DisconnectHandler(platformView);
@@ -62,12 +68,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 		protected override void UpdateItemsSource()
 		{
-			var itemsSource = ItemsView.ItemsSource;
+			var itemsSource = ItemsView?.ItemsSource;
 
 			if (itemsSource == null)
 				return;
 
-			var itemTemplate = ItemsView.ItemTemplate;
+			var itemTemplate = ItemsView?.ItemTemplate;
 
 			if (itemTemplate == null)
 				return;
@@ -90,13 +96,14 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			_scrollViewer = scrollViewer;
 			_scrollViewer.ViewChanging += OnScrollViewChanging;
 			_scrollViewer.ViewChanged += OnScrollViewChanged;
-			_scrollViewer.SizeChanged += InitialSetup;
+			_scrollViewer.SizeChanged += OnScrollViewSizeChanged;
 
 			UpdateScrollBarVisibilityForLoop();
 		}
 
 		protected override ICollectionView GetCollectionView(CollectionViewSource collectionViewSource)
 		{
+			_loopableCollectionView?.CleanUp();
 			_loopableCollectionView = new LoopableCollectionView(base.GetCollectionView(collectionViewSource));
 
 			if (Element is CarouselView cv && cv.Loop)
@@ -118,7 +125,10 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				GetItemHeight(), GetItemWidth(), GetItemSpacing(), MauiContext);
 
 			if (collectionViewSource is ObservableItemTemplateCollection observableItemsSource)
-				observableItemsSource.CollectionChanged += OnCollectionItemsSourceChanged;
+			{
+				_collectionChanged ??= OnCollectionItemsSourceChanged;
+				_proxy.Subscribe(observableItemsSource, _collectionChanged);
+			}
 
 			return new CollectionViewSource
 			{
@@ -179,7 +189,13 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 		public static void MapPosition(CarouselViewHandler handler, CarouselView carouselView)
 		{
-			handler.UpdatePosition();
+			// If the initial position hasn't been set, we have a UpdateInitialPosition call on CarouselViewHandler
+			// that will handle this so we want to skip this mapper call. We need to wait for the LIstView to be ready
+			if (handler.InitialPositionSet)
+			{
+				handler.UpdatePosition();
+			}
+			
 		}
 
 		public static void MapIsBounceEnabled(CarouselViewHandler handler, CarouselView carouselView)
@@ -201,6 +217,9 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 		{
 			handler.UpdateLoop();
 		}
+
+		internal bool InitialPositionSet { get; private set; }
+
 
 		void UpdateIsBounceEnabled()
 		{
@@ -329,13 +348,18 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			return -1;
 		}
 
-		void UpdateCarouselViewInitialPosition()
+		void UpdateInitialPosition()
 		{
+			if (ListViewBase == null)
+			{
+				return;
+			}
+
 			if (ListViewBase.Items.Count > 0)
 			{
 				if (Element.Loop)
 				{
-					var item = ListViewBase.Items[0];
+					var item = ItemsView.CurrentItem ?? ListViewBase.Items.FirstOrDefault();
 					_loopableCollectionView.CenterMode = true;
 					ListViewBase.ScrollIntoView(item);
 					_loopableCollectionView.CenterMode = false;
@@ -345,6 +369,8 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 					UpdateCurrentItem();
 				else
 					UpdatePosition();
+
+				InitialPositionSet = true;
 			}
 		}
 
@@ -406,7 +432,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 		void UpdateSnapPointsType()
 		{
-			if (_scrollViewer == null)
+			if (_scrollViewer == null || CarouselItemsLayout == null)
 				return;
 
 			if (CarouselItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal)
@@ -418,7 +444,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 		void UpdateSnapPointsAlignment()
 		{
-			if (_scrollViewer == null)
+			if (_scrollViewer == null || CarouselItemsLayout == null)
 				return;
 
 			if (CarouselItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal)
@@ -521,20 +547,49 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			SetCarouselViewPosition(carouselPosition);
 		}
 
-		void InitialSetup(object sender, SizeChangedEventArgs e)
+		void OnListViewSizeChanged(object sender, SizeChangedEventArgs e) => Resize(e.NewSize);
+
+		void OnScrollViewSizeChanged(object sender, SizeChangedEventArgs e)
 		{
-			if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
+			//If there's a scroll viewer, it's enough to resize based on its size changed event, so we can avoid two event handlers doing the same
+			ListViewBase.SizeChanged -= OnListViewSizeChanged;
+			Resize(e.NewSize);
+		}
+
+		void Resize(Size newSize)
+		{
+			if (newSize != _currentSize && newSize.Width > 0 && newSize.Height > 0)
 			{
-				ListViewBase.SizeChanged -= InitialSetup;
+				_currentSize = newSize;
 
-				if (_scrollViewer != null)
-					_scrollViewer.SizeChanged -= InitialSetup;
+				if (_isCarouselViewReady)
+					InvalidateItemSize();
+				else
+					InitialSetup();
 
-				UpdateItemsSource();
-				UpdateSnapPointsType();
-				UpdateSnapPointsAlignment();
-				UpdateCarouselViewInitialPosition();
+				_isCarouselViewReady = true;
 			}
+		}
+
+		void InitialSetup()
+		{
+			UpdateItemsSource();
+			UpdateSnapPointsType();
+			UpdateSnapPointsAlignment();
+			UpdateInitialPosition();
+		}
+
+		void InvalidateItemSize()
+		{
+			var itemHeight = GetItemHeight();
+			var itemWidth = GetItemWidth();
+
+			foreach (var item in ListViewBase.GetChildren<ItemContentControl>())
+			{
+				item.ItemHeight = itemHeight;
+				item.ItemWidth = itemWidth;
+			}
+			ListViewBase.InvalidateMeasure();
 		}
 	}
 }

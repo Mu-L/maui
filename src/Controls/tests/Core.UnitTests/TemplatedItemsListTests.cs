@@ -177,7 +177,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.Equal(NotifyCollectionChangedAction.Add, args.Action);
 			Assert.Equal(0, args.NewStartingIndex);
 			Assert.NotNull(args.NewItems);
-			Assert.Equal(1, args.NewItems.Count);
+			Assert.Single(args.NewItems);
 			Assert.Same(str, ((Cell)args.NewItems[0]).BindingContext);
 		}
 
@@ -494,7 +494,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 					raised = true;
 			};
 
-			bindable.ItemsSource = new object[0];
+			bindable.ItemsSource = Array.Empty<object>();
 
 			Assert.True(raised, "INPC not raised for ItemsSource");
 		}

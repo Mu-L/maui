@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>$(MauiPlatforms)</TargetFrameworks>
+    <TargetFrameworks>$(MauiSamplePlatforms)</TargetFrameworks>
+    <TargetFrameworks Condition=" '$(UseMaui)' != 'true' and '$(IncludePreviousTfms)' == 'true' ">$(TargetFrameworks);$(MauiSamplePreviousPlatforms)</TargetFrameworks>
     <RootNamespace>Maui.Essentials.Sample</RootNamespace>
     <AssemblyName>Microsoft.Maui.Essentials.Sample</AssemblyName>
     <OutputType>Exe</OutputType>
@@ -10,6 +11,7 @@
     <NoWarn>$(NoWarn),CA1416</NoWarn>
     <!-- Disable multi-RID builds to workaround a parallel build issue -->
     <RuntimeIdentifier Condition="$(TargetFramework.Contains('-maccatalyst'))">maccatalyst-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="$(TargetFramework.Contains('-maccatalyst')) and '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'arm64'">maccatalyst-arm64</RuntimeIdentifier>
   </PropertyGroup>
 
   <PropertyGroup>

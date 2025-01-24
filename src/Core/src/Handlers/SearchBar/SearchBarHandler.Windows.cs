@@ -84,6 +84,11 @@ namespace Microsoft.Maui.Handlers
 			handler.PlatformView?.UpdateIsTextPredictionEnabled(searchBar);
 		}
 
+		public static void MapIsSpellCheckEnabled(ISearchBarHandler handler, ISearchBar searchBar)
+		{
+			handler.PlatformView?.UpdateIsSpellCheckEnabled(searchBar);
+		}
+
 		public static void MapMaxLength(ISearchBarHandler handler, ISearchBar searchBar)
 		{
 			handler.PlatformView?.UpdateMaxLength(searchBar);
@@ -97,6 +102,11 @@ namespace Microsoft.Maui.Handlers
 		public static void MapCancelButtonColor(ISearchBarHandler handler, ISearchBar searchBar)
 		{
 			handler.PlatformView?.UpdateCancelButtonColor(searchBar);
+		}
+
+		internal static void MapSearchIconColor(ISearchBarHandler handler, ISearchBar searchBar)
+		{
+			handler.PlatformView?.UpdateSearchIconColor(searchBar);
 		}
 
 		public static void MapKeyboard(ISearchBarHandler handler, ISearchBar searchBar)
@@ -114,7 +124,9 @@ namespace Microsoft.Maui.Handlers
 				PlatformView?.UpdateMaxLength(VirtualView);
 				PlatformView?.UpdateIsReadOnly(VirtualView);
 				PlatformView?.UpdateIsTextPredictionEnabled(VirtualView);
+				PlatformView?.UpdateIsSpellCheckEnabled(VirtualView);
 				PlatformView?.UpdateCancelButtonColor(VirtualView);
+				PlatformView?.UpdateSearchIconColor(VirtualView);
 				PlatformView?.UpdateKeyboard(VirtualView);
 			}
 		}

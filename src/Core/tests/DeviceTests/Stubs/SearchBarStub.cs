@@ -27,6 +27,8 @@ namespace Microsoft.Maui.DeviceTests.Stubs
 
 		public Color CancelButtonColor { get; set; }
 
+		public Color SearchIconColor { get; set; }
+
 		public double CharacterSpacing { get; set; }
 
 		public Font Font { get; set; }
@@ -40,6 +42,8 @@ namespace Microsoft.Maui.DeviceTests.Stubs
 		public int SelectionLength { get; set; }
 
 		public bool IsTextPredictionEnabled { get; set; } = true;
+
+		public bool IsSpellCheckEnabled { get; set; } = true;
 
 		public bool IsReadOnly { get; set; }
 

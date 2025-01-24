@@ -26,7 +26,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 
 		void OnVisualTreeChanged(object? sender, VisualTreeChangeEventArgs e)
 		{
-			Assert.True(e.ChildIndex >= 0, "Visual Tree inaccurate when OnVisualTreeChanged called");
+			Assert.True(e.ChildIndex >= 0, $"Visual Tree inaccurate when OnVisualTreeChanged called. ChildIndex: {e.ChildIndex}");
 			_treeEvents.Add((sender as Element, e));
 			VisualTreeChanged?.Invoke(sender as Element, e);
 		}
@@ -73,7 +73,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public async Task ModalChildrenFiresDiagnosticEvents()
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out var window, out _);
@@ -114,11 +114,11 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var windowChildren = ((IVisualTreeElement)window).GetVisualChildren();
 			var pageChildren = ((IVisualTreeElement)page).GetVisualChildren();
 
-			Assert.Equal(1, appChildren.Count);
+			Assert.Single(appChildren);
 			Assert.Equal(window, appChildren[0]);
-			Assert.Equal(1, windowChildren.Count);
+			Assert.Single(windowChildren);
 			Assert.Equal(page, windowChildren[0]);
-			Assert.Equal(0, pageChildren.Count);
+			Assert.Empty(pageChildren);
 		}
 
 		[Fact]
@@ -138,7 +138,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public async Task AddPageContentFiresVisualTreeChanged()
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out _, out var page);
@@ -159,7 +159,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public async Task RemovePageContentFiresVisualTreeChanged()
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out _, out var page);
@@ -186,7 +186,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[InlineData(typeof(StackLayout))]
 		public void AddLayoutChildFiresVisualTreeChanged(Type TLayout)
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out _, out var page);
@@ -223,7 +223,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[InlineData(typeof(StackLayout))]
 		public void InsertLayoutChildFiresVisualTreeChanged(Type TLayout)
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out _, out var page);
@@ -255,7 +255,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[InlineData(typeof(StackLayout))]
 		public void RemoveLayoutChildFiresVisualTreeChanged(Type TLayout)
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out _, out var page);
@@ -286,7 +286,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[InlineData(typeof(StackLayout))]
 		public void ClearLayoutChildrenFiresVisualTreeChanged(Type TLayout)
 		{
-			if (!DebuggerHelper.DebuggerIsAttached)
+			if (!VisualDiagnostics.IsEnabled)
 				return;
 
 			CreateNewApp(out _, out _, out var page);

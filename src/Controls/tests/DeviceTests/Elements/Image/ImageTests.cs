@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
@@ -42,9 +43,37 @@ namespace Microsoft.Maui.DeviceTests
 			await InvokeOnMainThreadAsync(async () =>
 			{
 				var handler = CreateHandler<LayoutHandler>(layout);
-				await image.Wait();
+				await image.WaitUntilLoaded();
 				await handler.ToPlatform().AssertContainsColor(Colors.Red, MauiContext);
 			});
+		}
+
+		// NOTE: this test is slightly different than MemoryTests.HandlerDoesNotLeak
+		// It sets image.Source and waits for it to load, a valid test case.
+		[Fact("Image Does Not Leak")]
+		public async Task DoesNotLeak()
+		{
+			SetupBuilder();
+			WeakReference platformViewReference = null;
+			WeakReference handlerReference = null;
+
+			await InvokeOnMainThreadAsync(async () =>
+			{
+				var layout = new VerticalStackLayout();
+				var image = new Image
+				{
+					Background = Colors.Black,
+					Source = "red.png",
+				};
+				layout.Add(image);
+
+				var handler = CreateHandler<LayoutHandler>(layout);
+				handlerReference = new WeakReference(image.Handler);
+				platformViewReference = new WeakReference(image.Handler.PlatformView);
+				await image.WaitUntilLoaded();
+			});
+
+			await AssertionExtensions.WaitForGC(handlerReference, platformViewReference);
 		}
 	}
 }

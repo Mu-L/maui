@@ -1,9 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using Microsoft.Maui.Graphics;
+using Microsoft.UI;
+using Microsoft.UI.Input;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.Win32;
 using Windows.Foundation;
+using FRect = Windows.Foundation.Rect;
+using Rect32 = Windows.Graphics.RectInt32;
+using ViewManagement = Windows.UI.ViewManagement;
 using WThickness = Microsoft.UI.Xaml.Thickness;
 
 namespace Microsoft.Maui.Platform
@@ -21,13 +31,17 @@ namespace Microsoft.Maui.Platform
 		internal event EventHandler? ContentChanged;
 		MauiToolbar? _toolbar;
 		MenuBar? _menuBar;
+		ITitleBar? _titleBar;
 		FrameworkElement? _appTitleBar;
-		bool _hasTitleBarImage = false;
+		bool _hasTitleBarImage;
+		ViewManagement.UISettings _viewSettings;
 		public event TypedEventHandler<NavigationView, NavigationViewBackRequestedEventArgs>? BackRequested;
 
 		public WindowRootView()
 		{
 			IsTabStop = false;
+			PassthroughTitlebarElements = new List<FrameworkElement>();
+			_viewSettings = new ViewManagement.UISettings();
 		}
 
 		internal double AppTitleBarActualHeight => AppTitleBarContentControl?.ActualHeight ?? 0;
@@ -36,6 +50,7 @@ namespace Microsoft.Maui.Platform
 
 		Image? AppFontIcon { get; set; }
 		internal TextBlock? AppTitle { get; private set; }
+		internal WindowId? AppWindowId { get; set; }
 
 		public RootNavigationView? NavigationViewControl { get; private set; }
 
@@ -93,24 +108,19 @@ namespace Microsoft.Maui.Platform
 					_appTitleBar = cp;
 				}
 
-				UpdateAppTitleBarTransparency();
-
 				return _appTitleBar;
 			}
 		}
 
-		internal void UpdateAppTitleBar(int appTitleBarHeight, bool useCustomAppTitleBar)
+		internal void UpdateAppTitleBar(int appTitleBarHeight, bool useCustomAppTitleBar, WThickness margin)
 		{
 			_useCustomAppTitleBar = useCustomAppTitleBar;
 			WindowTitleBarContentControlMinHeight = appTitleBarHeight;
-			double topMargin = 0;
+
+			double topMargin = appTitleBarHeight;
 			if (AppTitleBarContentControl != null)
 			{
-				topMargin = AppTitleBarContentControl.ActualHeight;
-			}
-			else
-			{
-				topMargin = appTitleBarHeight;
+				topMargin = Math.Min(appTitleBarHeight, AppTitleBarContentControl.ActualHeight);
 			}
 
 			if (useCustomAppTitleBar)
@@ -122,12 +132,16 @@ namespace Microsoft.Maui.Platform
 				WindowTitleBarContentControlVisibility = UI.Xaml.Visibility.Collapsed;
 			}
 
+			WindowTitleMargin = margin;
 			UpdateRootNavigationViewMargins(topMargin);
+			this.RefreshThemeResources();
 		}
 
 		protected override void OnApplyTemplate()
 		{
 			base.OnApplyTemplate();
+
+			_viewSettings.ColorValuesChanged += ViewSettingsColorValuesChanged;
 
 			AppTitleBarContainer = (FrameworkElement)GetTemplateChild("AppTitleBarContainer");
 			AppTitleBarContentControl = (ContentControl?)GetTemplateChild("AppTitleBarContentControl") ??
@@ -174,16 +188,67 @@ namespace Microsoft.Maui.Platform
 			AppTitleBarContentControl.SizeChanged += (sender, args) =>
 			{
 				OnWindowTitleBarContentSizeChanged?.Invoke(sender, EventArgs.Empty);
-				if (sender is not FrameworkElement fe)
-					return;
-
-				if (_appTitleBarHeight != fe.ActualHeight)
-				{
-					UpdateRootNavigationViewMargins(fe.ActualHeight);
-					this.RefreshThemeResources();
-				}
+				UpdateTitleBarContentSize();
 			};
+
+			UpdateTitleBarContentSize();
 		}
+
+		internal void UpdateTitleBarContentSize()
+		{
+			if (AppTitleBarContentControl is null)
+				return;
+
+			if (_appTitleBarHeight != AppTitleBarContentControl.ActualHeight &&
+				AppTitleBarContentControl.Visibility == UI.Xaml.Visibility.Visible)
+			{
+				UpdateRootNavigationViewMargins(AppTitleBarContentControl.ActualHeight);
+
+				if (AppWindowId.HasValue)
+				{
+					AppWindow.GetFromWindowId(AppWindowId.Value).TitleBar.PreferredHeightOption =
+						_appTitleBarHeight >= 48 ? TitleBarHeightOption.Tall : TitleBarHeightOption.Standard;
+				}
+
+				this.RefreshThemeResources();
+			}
+
+			var rectArray = new List<Rect32>();
+			foreach (var child in PassthroughTitlebarElements)
+			{
+				var transform = child.TransformToVisual(null);
+				var bounds = transform.TransformBounds(
+					new FRect(0, 0, child.ActualWidth, child.ActualHeight));
+				var rect = GetRect(bounds, XamlRoot.RasterizationScale);
+				rectArray.Add(rect);
+			}
+
+			if (AppWindowId.HasValue)
+			{
+				var nonClientInputSrc =
+					InputNonClientPointerSource.GetForWindowId(AppWindowId.Value);
+
+				if (rectArray.Count > 0)
+				{
+					nonClientInputSrc.SetRegionRects(NonClientRegionKind.Passthrough, [.. rectArray]);
+				}
+				else
+				{
+					nonClientInputSrc.ClearRegionRects(NonClientRegionKind.Passthrough);
+				}
+			}
+		}
+
+		private static Rect32 GetRect(FRect bounds, double scale)
+		{
+			return new Rect32(
+				_X: (int)Math.Round(bounds.X * scale),
+				_Y: (int)Math.Round(bounds.Y * scale),
+				_Width: (int)Math.Round(bounds.Width * scale),
+				_Height: (int)Math.Round(bounds.Height * scale)
+			);
+		}
+
 		void OnAppTitleBarContentControlLoaded(object sender, RoutedEventArgs e)
 		{
 			LoadAppTitleBarControls();
@@ -208,24 +273,57 @@ namespace Microsoft.Maui.Platform
 
 		void LoadAppTitleBarControls()
 		{
-			if (AppTitleBar == null)
-				return;
-
-			if (AppFontIcon != null)
-				return;
-
-			AppFontIcon = (Image?)AppTitleBar?.FindName("AppFontIcon");
-			AppTitle = (TextBlock?)AppTitleBar?.FindName("AppTitle");
-
-			if (AppFontIcon != null)
+			if (WindowTitleBarContent is not null && AppTitleBarContentControl is not null)
 			{
-				AppFontIcon.ImageOpened += OnImageOpened;
-				AppFontIcon.ImageFailed += OnImageFailed;
+				AppTitleBarContentControl.ContentTemplateSelector = null;
+				AppTitleBarContentControl.Content = WindowTitleBarContent;
+			}
+			else if (AppTitleBar != null && AppFontIcon is null)
+			{
+				AppFontIcon = (Image?)AppTitleBar?.FindName("AppFontIcon");
+				AppTitle = (TextBlock?)AppTitleBar?.FindName("AppTitle");
+
+				if (AppFontIcon != null)
+				{
+					AppFontIcon.ImageOpened += OnImageOpened;
+					AppFontIcon.ImageFailed += OnImageFailed;
+				}
+
+				ApplyTitlebarColorPrevalence();
 			}
 
 			UpdateAppTitleBarMargins();
 		}
 
+		private void ViewSettingsColorValuesChanged(ViewManagement.UISettings sender, object args)
+		{
+			ApplyTitlebarColorPrevalence();
+		}
+
+		void ApplyTitlebarColorPrevalence()
+		{
+			try
+			{
+				// Figure out if the "show accent color on title bars" setting is enabled
+				using var dwmSubKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM\");
+				var enableAccentColor = dwmSubKey?.GetValue("ColorPrevalence");
+				if (enableAccentColor != null &&
+					int.TryParse(enableAccentColor.ToString(), out var enableValue) &&
+					_appTitleBar is Border border)
+				{
+					DispatcherQueue.TryEnqueue(() =>
+					{
+						border.Background = enableValue == 1 ?
+							new SolidColorBrush(_viewSettings.GetColorValue(ViewManagement.UIColorType.Accent)) :
+							new SolidColorBrush(UI.Colors.Transparent);
+
+						if (NavigationViewControl != null && NavigationViewControl.ButtonHolderGrid != null)
+							NavigationViewControl.ButtonHolderGrid.Background = border.Background;
+					});
+				}
+			}
+			catch (Exception) { }
+		}
 
 		ActionDisposable? _contentChanged;
 
@@ -317,12 +415,10 @@ namespace Microsoft.Maui.Platform
 			// If the AppIcon loads correctly then we set a margin for the text from the image
 			if (_hasTitleBarImage)
 			{
-				WindowTitleMargin = new WThickness(12, 0, 0, 0);
 				WindowTitleIconVisibility = UI.Xaml.Visibility.Visible;
 			}
 			else
 			{
-				WindowTitleMargin = new WThickness(0);
 				WindowTitleIconVisibility = UI.Xaml.Visibility.Collapsed;
 			}
 		}
@@ -330,6 +426,138 @@ namespace Microsoft.Maui.Platform
 		void OnButtonHolderGridSizeChanged(object sender, SizeChangedEventArgs e)
 		{
 			UpdateAppTitleBarMargins();
+		}
+
+		internal void SetTitleBar(ITitleBar? titlebar, IMauiContext? mauiContext)
+		{
+			if (WindowTitleBarContent is not null)
+			{
+				WindowTitleBarContent.LayoutUpdated -= PlatformView_LayoutUpdated;
+			}
+
+			if (_titleBar is INotifyPropertyChanged p)
+			{
+				p.PropertyChanged -= TitlebarPropChanged_PropertyChanged;
+			}
+
+			_titleBar = titlebar;
+
+			if (_titleBar is null || mauiContext is null)
+			{
+				UpdateBackgroundColorForButtons();
+				if (AppTitleBarContentControl is not null)
+				{
+					AppTitleBarContentControl.Content = null;
+				}
+				return;
+			}
+
+			var handler = _titleBar?.ToHandler(mauiContext);
+			if (handler is not null &&
+				handler.PlatformView is not null)
+			{
+				WindowTitleBarContent = handler.PlatformView;
+
+				// This will handle all size changed events when leading/trailing/main content
+				// changes size or is added
+				WindowTitleBarContent.LayoutUpdated += PlatformView_LayoutUpdated;
+
+				// Override the template selector and content
+				if (AppTitleBarContentControl is not null)
+				{
+					AppTitleBarContentControl.ContentTemplateSelector = null;
+					AppTitleBarContentControl.Content = WindowTitleBarContent;
+				}
+
+				// To handle when leading/trailing/main content is added/removed
+				if (_titleBar is INotifyPropertyChanged tpc)
+				{
+					tpc.PropertyChanged += TitlebarPropChanged_PropertyChanged;
+				}
+
+				UpdateBackgroundColorForButtons();
+				SetTitleBarInputElements();
+			}
+		}
+
+		internal void SetTitleBarVisibility(UI.Xaml.Visibility visibility)
+		{
+			// Set default and custom titlebar container visibility
+			if (AppTitleBarContainer is not null)
+			{
+				AppTitleBarContainer.Visibility = visibility;
+			}
+
+			// Set the back/flyout button container visibility
+			if (NavigationViewControl is not null &&
+				NavigationViewControl.ButtonHolderGrid is not null)
+			{
+				NavigationViewControl.ButtonHolderGrid.Visibility = visibility;
+			}
+		}
+
+		private void TitlebarPropChanged_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (_titleBar is not null && _titleBar.Handler?.MauiContext is not null)
+			{
+				SetTitleBarInputElements();
+
+				if (e.PropertyName == "BackgroundColor")
+				{
+					UpdateBackgroundColorForButtons();
+				}
+			}
+		}
+
+		private void UpdateBackgroundColorForButtons()
+		{
+			if (NavigationViewControl?.ButtonHolderGrid is not null)
+			{
+				if (_titleBar?.Background is SolidPaint bg)
+				{
+					NavigationViewControl.ButtonHolderGrid.Background = new SolidColorBrush(bg.Color.ToWindowsColor());
+				}
+				else
+				{
+					NavigationViewControl.ButtonHolderGrid.Background = new SolidColorBrush(UI.Colors.Transparent);
+				}
+			}
+		}
+
+		private void PlatformView_LayoutUpdated(object? sender, object e)
+		{
+			UpdateTitleBarContentSize();
+		}
+
+		private void SetTitleBarInputElements()
+		{
+			var mauiContext = _titleBar?.Handler?.MauiContext;
+			if (mauiContext is null || _titleBar is null)
+			{
+				return;
+			}
+
+			var passthroughElements = new List<FrameworkElement>();
+			foreach (var element in _titleBar.PassthroughElements)
+			{
+				if (element is IContentView container && container.PresentedContent is not null)
+				{
+					var platformView = container.PresentedContent.ToHandler(mauiContext).PlatformView;
+					if (platformView is not null)
+					{
+						passthroughElements.Add(platformView);
+					}
+				}
+				else
+				{
+					var platformView = element.ToHandler(mauiContext).PlatformView;
+					if (platformView is not null)
+					{
+						passthroughElements.Add(platformView);
+					}
+				}
+			}
+			PassthroughTitlebarElements = passthroughElements;
 		}
 
 		static void OnAppTitleBarTemplateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -350,27 +578,17 @@ namespace Microsoft.Maui.Platform
 			set => SetValue(TitleProperty, value);
 		}
 
-		// Once we switch the TitleBar over to using replaceable IViews we won't need this
-		// but for the sake of first just getting us converted over to the new TitleBar
-		// APIs
-		bool _setTitleBarBackgroundToTransparent = true;
-		internal void SetTitleBarBackgroundToTransparent(bool value)
-		{
-			_setTitleBarBackgroundToTransparent = value;
-			if (value)
-			{
-				UpdateAppTitleBarTransparency();
-			}
-			else
-			{
-				_appTitleBar?.RefreshThemeResources();
-			}
-		}
+		internal static readonly DependencyProperty WindowTitleBarContentProperty =
+			DependencyProperty.Register(
+				nameof(WindowTitleBarContent),
+				typeof(FrameworkElement),
+				typeof(WindowRootView),
+				new PropertyMetadata(null));
 
-		void UpdateAppTitleBarTransparency()
+		internal FrameworkElement WindowTitleBarContent
 		{
-			if (_setTitleBarBackgroundToTransparent && _appTitleBar is Border border)
-				border.Background = null;
+			get => (FrameworkElement)GetValue(WindowTitleBarContentProperty);
+			set => SetValue(WindowTitleBarContentProperty, value);
 		}
 
 		internal static readonly DependencyProperty WindowTitleForegroundProperty =
@@ -450,5 +668,7 @@ namespace Microsoft.Maui.Platform
 			get => (double)GetValue(WindowTitleBarContentControlMinHeightProperty);
 			set => SetValue(WindowTitleBarContentControlMinHeightProperty, value);
 		}
+
+		internal IEnumerable<FrameworkElement> PassthroughTitlebarElements { get; set; }
 	}
 }

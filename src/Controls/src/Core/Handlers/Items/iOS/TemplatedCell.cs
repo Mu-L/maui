@@ -5,21 +5,37 @@ using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Graphics;
-using ObjCRuntime;
 using UIKit;
 
 namespace Microsoft.Maui.Controls.Handlers.Items
 {
 	public abstract class TemplatedCell : ItemsViewCell
 	{
-		public event EventHandler<EventArgs> ContentSizeChanged;
-		public event EventHandler<LayoutAttributesChangedEventArgs> LayoutAttributesChanged;
+		readonly WeakEventManager _weakEventManager = new();
+
+		public event EventHandler<EventArgs> ContentSizeChanged
+		{
+			add => _weakEventManager.AddEventHandler(value);
+			remove => _weakEventManager.RemoveEventHandler(value);
+		}
+
+		public event EventHandler<LayoutAttributesChangedEventArgs> LayoutAttributesChanged
+		{
+			add => _weakEventManager.AddEventHandler(value);
+			remove => _weakEventManager.RemoveEventHandler(value);
+		}
 
 		protected CGSize ConstrainedSize;
 
 		protected nfloat ConstrainedDimension;
 
-		public DataTemplate CurrentTemplate { get; private set; }
+		WeakReference<DataTemplate> _currentTemplate;
+
+		public DataTemplate CurrentTemplate
+		{
+			get => _currentTemplate is not null && _currentTemplate.TryGetTarget(out var target) ? target : null;
+			private set => _currentTemplate = value is null ? null : new(value);
+		}
 
 		// Keep track of the cell size so we can verify whether a measure invalidation 
 		// actually changed the size of the cell
@@ -33,7 +49,13 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 		{
 		}
 
-		internal IPlatformViewHandler PlatformHandler { get; private set; }
+		WeakReference<IPlatformViewHandler> _handler;
+
+		internal IPlatformViewHandler PlatformHandler
+		{
+			get => _handler is not null && _handler.TryGetTarget(out var h) ? h : null;
+			set => _handler = value == null ? null : new(value);
+		}
 
 		public override void ConstrainTo(CGSize constraint)
 		{
@@ -53,6 +75,15 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			ConstrainedDimension = default;
 		}
 
+		internal void Unbind()
+		{
+			if (PlatformHandler?.VirtualView is View view)
+			{
+				view.MeasureInvalidated -= MeasureInvalidated;
+				view.BindingContext = null;
+			}
+		}
+
 		public override UICollectionViewLayoutAttributes PreferredLayoutAttributesFittingAttributes(
 			UICollectionViewLayoutAttributes layoutAttributes)
 		{
@@ -60,7 +91,7 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 
 			var preferredSize = preferredAttributes.Frame.Size;
 
-			if (SizesAreSame(preferredSize, _size)
+			if (preferredSize.IsCloseTo(_size)
 				&& AttributesConsistentWithConstrainedDimension(preferredAttributes))
 			{
 				return preferredAttributes;
@@ -72,8 +103,6 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			preferredAttributes.Frame = new CGRect(preferredAttributes.Frame.Location, size);
 
 			OnLayoutAttributesChanged(preferredAttributes);
-
-			//_isMeasured = true;
 
 			return preferredAttributes;
 		}
@@ -113,6 +142,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			_size = rectangle.Size;
 		}
 
+		public override void PrepareForReuse()
+		{
+			Unbind();
+			base.PrepareForReuse();
+		}
+
 		public void Bind(DataTemplate template, object bindingContext, ItemsView itemsView)
 		{
 			var oldElement = PlatformHandler?.VirtualView as View;
@@ -133,7 +168,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				}
 
 				// Create the content and renderer for the view 
-				var view = itemTemplate.CreateContent() as View;
+				var content = itemTemplate.CreateContent();
+
+				if (content is not View view)
+				{
+					throw new InvalidOperationException($"{itemTemplate} could not be created from {content}");
+				}
 
 				// Set the binding context _before_ we create the renderer; that way, it's available during OnElementChanged
 				view.BindingContext = bindingContext;
@@ -147,34 +187,17 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				// emit a bunch of needless binding errors
 				itemsView.AddLogicalChild(view);
 
-				// Prevents the use of default color when there are VisualStateManager with Selected state setting the background color
-				// First we check whether the cell has the default selected background color; if it does, then we should check
-				// to see if the cell content is the VSM to set a selected color 
-				if (SelectedBackgroundView.BackgroundColor == Maui.Platform.ColorExtensions.Gray && IsUsingVSMForSelectionColor(view))
-				{
-					SelectedBackgroundView = new UIView
-					{
-						BackgroundColor = UIColor.Clear
-					};
-				}
+				UpdateSelectionColor(view);
 			}
 			else
 			{
 				// Same template
 				if (oldElement != null)
 				{
-					if (oldElement.BindingContext == null || !(oldElement.BindingContext.Equals(bindingContext)))
-					{
-						// If the data is different, update it
+					oldElement.BindingContext = bindingContext;
+					oldElement.MeasureInvalidated += MeasureInvalidated;
 
-						// Unhook the MeasureInvalidated handler, otherwise it'll fire for every invalidation during the 
-						// BindingContext change
-						oldElement.MeasureInvalidated -= MeasureInvalidated;
-						oldElement.BindingContext = bindingContext;
-						oldElement.MeasureInvalidated += MeasureInvalidated;
-
-						UpdateCellSize();
-					}
+					UpdateCellSize();
 				}
 			}
 
@@ -251,6 +274,12 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				base.Selected = value;
 
 				UpdateVisualStates();
+
+				if (base.Selected)
+				{
+					// This must be called here otherwise the first item will have a gray background
+					UpdateSelectionColor();
+				}
 			}
 		}
 
@@ -268,38 +297,21 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 			// Cache the size for next time
 			_size = toSize;
 
-			// Let the controller know that things need to be laid out again
+			// Let the controller know that things need to be arranged again
 			OnContentSizeChanged();
 		}
 
 		protected void OnContentSizeChanged()
 		{
-			ContentSizeChanged?.Invoke(this, EventArgs.Empty);
+			_weakEventManager.HandleEvent(this, EventArgs.Empty, nameof(ContentSizeChanged));
 		}
 
 		protected void OnLayoutAttributesChanged(UICollectionViewLayoutAttributes newAttributes)
 		{
-			LayoutAttributesChanged?.Invoke(this, new LayoutAttributesChangedEventArgs(newAttributes));
+			_weakEventManager.HandleEvent(this, new LayoutAttributesChangedEventArgs(newAttributes), nameof(LayoutAttributesChanged));
 		}
 
 		protected abstract bool AttributesConsistentWithConstrainedDimension(UICollectionViewLayoutAttributes attributes);
-
-		bool SizesAreSame(CGSize preferredSize, Size elementSize)
-		{
-			const double tolerance = 0.000001;
-
-			if (Math.Abs(preferredSize.Height - elementSize.Height) > tolerance)
-			{
-				return false;
-			}
-
-			if (Math.Abs(preferredSize.Width - elementSize.Width) > tolerance)
-			{
-				return false;
-			}
-
-			return true;
-		}
 
 		void UpdateVisualStates()
 		{
@@ -308,6 +320,33 @@ namespace Microsoft.Maui.Controls.Handlers.Items
 				VisualStateManager.GoToState(element, Selected
 					? VisualStateManager.CommonStates.Selected
 					: VisualStateManager.CommonStates.Normal);
+			}
+		}
+
+		void UpdateSelectionColor()
+		{
+			if (PlatformHandler?.VirtualView is not View view)
+			{
+				return;
+			}
+
+			UpdateSelectionColor(view);
+		}
+
+		void UpdateSelectionColor(View view)
+		{
+			if (SelectedBackgroundView is null)
+			{
+				return;
+			}
+
+			// Prevents the use of default color when there are VisualStateManager with Selected state setting the background color
+			// First we check whether the cell has the default selected background color; if it does, then we should check
+			// to see if the cell content is the VSM to set a selected color
+
+			if (ColorExtensions.AreEqual(SelectedBackgroundView.BackgroundColor, ColorExtensions.Gray) && IsUsingVSMForSelectionColor(view))
+			{
+				SelectedBackgroundView.BackgroundColor = UIColor.Clear;
 			}
 		}
 	}

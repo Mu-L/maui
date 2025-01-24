@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Xml;
@@ -14,6 +15,10 @@ using static System.String;
 
 namespace Microsoft.Maui.Controls.Xaml
 {
+	[RequiresUnreferencedCode(TrimmerConstants.XamlRuntimeParsingNotSupportedWarning)]
+#if !NETSTANDARD
+	[RequiresDynamicCode(TrimmerConstants.XamlRuntimeParsingNotSupportedWarning)]
+#endif
 	class ApplyPropertiesVisitor : IXamlNodeVisitor
 	{
 		public static readonly IList<XmlName> Skips = new List<XmlName> {
@@ -49,7 +54,7 @@ namespace Microsoft.Maui.Controls.Xaml
 				return;
 
 
-			if (TryGetPropertyName(node, parentNode, out XmlName propertyName))
+			if (node.TryGetPropertyName(parentNode, out XmlName propertyName))
 			{
 				if (TrySetRuntimeName(propertyName, source, value, node))
 					return;
@@ -83,7 +88,7 @@ namespace Microsoft.Maui.Controls.Xaml
 
 		public void Visit(ElementNode node, INode parentNode)
 		{
-			if (TryGetPropertyName(node, parentNode, out XmlName propertyName) && propertyName == XmlName._CreateContent)
+			if (node.TryGetPropertyName(parentNode, out XmlName propertyName) && propertyName == XmlName._CreateContent)
 			{
 				var s0 = Values[parentNode];
 				if (s0 is ElementTemplate)
@@ -107,7 +112,7 @@ namespace Microsoft.Maui.Controls.Xaml
 			if (!Values.TryGetValue(node, out var value) && Context.ExceptionHandler != null)
 				return;
 
-			if (propertyName != XmlName.Empty || TryGetPropertyName(node, parentNode, out propertyName))
+			if (propertyName != XmlName.Empty || node.TryGetPropertyName(parentNode, out propertyName))
 			{
 				if (Skips.Contains(propertyName))
 					return;
@@ -176,7 +181,7 @@ namespace Microsoft.Maui.Controls.Xaml
 					return;
 				}
 
-				xpe = xpe ?? new XamlParseException($"Can not set the content of {((IElementNode)parentNode).XmlType.Name} as it doesn't have a ContentPropertyAttribute", node);
+				xpe = xpe ?? new XamlParseException($"Cannot set the content of {((IElementNode)parentNode).XmlType.Name} as it doesn't have a ContentPropertyAttribute", node);
 				if (Context.ExceptionHandler != null)
 					Context.ExceptionHandler(xpe);
 				else
@@ -227,22 +232,6 @@ namespace Microsoft.Maui.Controls.Xaml
 
 		public void Visit(ListNode node, INode parentNode)
 		{
-		}
-
-		public static bool TryGetPropertyName(INode node, INode parentNode, out XmlName name)
-		{
-			name = default(XmlName);
-			var parentElement = parentNode as IElementNode;
-			if (parentElement == null)
-				return false;
-			foreach (var kvp in parentElement.Properties)
-			{
-				if (kvp.Value != node)
-					continue;
-				name = kvp.Key;
-				return true;
-			}
-			return false;
 		}
 
 		internal static bool IsCollectionItem(INode node, INode parentNode)
@@ -326,26 +315,15 @@ namespace Microsoft.Maui.Controls.Xaml
 			return false;
 		}
 
-		static BindableProperty GetBindableProperty(Type elementType, string localName, IXmlLineInfo lineInfo,
-			bool throwOnError = false)
+		static BindableProperty GetBindableProperty(Type elementType, string localName, IXmlLineInfo lineInfo)
 		{
 			// F# does not support public fields, so allow internal (Assembly) as well as public
 			const BindingFlags supportedFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy;
-			var bindableFieldInfo = elementType.GetFields(supportedFlags)
-												.FirstOrDefault(fi => (fi.IsAssembly || fi.IsPublic) && fi.Name == localName + "Property");
-
-			Exception exception = null;
-			if (exception == null && bindableFieldInfo == null)
+			var bindableFieldInfo = elementType.GetField(localName + "Property", supportedFlags);
+			if (bindableFieldInfo is not null && (bindableFieldInfo.IsAssembly || bindableFieldInfo.IsPublic))
 			{
-				exception =
-					new XamlParseException(
-						Format("BindableProperty {0} not found on {1}", localName + "Property", elementType.Name), lineInfo);
-			}
-
-			if (exception == null)
 				return bindableFieldInfo.GetValue(null) as BindableProperty;
-			if (throwOnError)
-				throw exception;
+			}
 			return null;
 		}
 
@@ -355,7 +333,7 @@ namespace Microsoft.Maui.Controls.Xaml
 			//If it's an attached BP, update elementType and propertyName
 			var bpOwnerType = xamlelement.GetType();
 			GetRealNameAndType(ref bpOwnerType, propertyName.NamespaceURI, ref localName, rootElement, lineInfo);
-			var property = GetBindableProperty(bpOwnerType, localName, lineInfo, false);
+			var property = GetBindableProperty(bpOwnerType, localName, lineInfo);
 
 			if (property != null)
 				return property;
@@ -368,7 +346,14 @@ namespace Microsoft.Maui.Controls.Xaml
 		public static void SetPropertyValue(object xamlelement, XmlName propertyName, object value, object rootElement, INode node, HydrationContext context, IXmlLineInfo lineInfo)
 		{
 			var serviceProvider = new XamlServiceProvider(node, context);
-			var xKey = node is IElementNode && ((IElementNode)node).Properties.ContainsKey(XmlName.xKey) ? ((ValueNode)((IElementNode)node).Properties[XmlName.xKey]).Value as string : null;
+			var xKey = node is IElementNode eNode && eNode.Properties.ContainsKey(XmlName.xKey) ? ((ValueNode)eNode.Properties[XmlName.xKey]).Value as string : null;
+
+			// Special handling for ResourceDictionary.Source
+			if (xamlelement is ResourceDictionary rd && propertyName.LocalName == "Source" && propertyName.NamespaceURI == "")
+			{
+				ResourceDictionaryHelpers.LoadFromSource(rd, (string)value, rootElement.GetType(), lineInfo);
+				return;
+			}
 
 			if (TrySetPropertyValue(xamlelement, propertyName, xKey, value, rootElement, lineInfo, serviceProvider, out var xpe))
 				return;
@@ -387,6 +372,8 @@ namespace Microsoft.Maui.Controls.Xaml
 
 			void registerSourceInfo(object target, string path)
 			{
+				if (VisualDiagnostics.GetSourceInfo(target) != null)
+					return;
 				var assemblyName = rootElement.GetType().Assembly?.GetName().Name;
 				if (lineInfo != null)
 					VisualDiagnostics.RegisterSourceInfo(target, new Uri($"{path};assembly={assemblyName}", UriKind.Relative), lineInfo.LineNumber, lineInfo.LinePosition);
@@ -395,7 +382,7 @@ namespace Microsoft.Maui.Controls.Xaml
 			//If it's an attached BP, update elementType and propertyName
 			var bpOwnerType = element.GetType();
 			var attached = GetRealNameAndType(ref bpOwnerType, propertyName.NamespaceURI, ref localName, rootElement, lineInfo);
-			var property = GetBindableProperty(bpOwnerType, localName, lineInfo, false);
+			var property = GetBindableProperty(bpOwnerType, localName, lineInfo);
 
 			//If the target is an event, connect
 			if (xpe == null && TryConnectEvent(element, localName, attached, value, rootElement, lineInfo, out xpe))
@@ -450,7 +437,7 @@ namespace Microsoft.Maui.Controls.Xaml
 			//If it's an attached BP, update elementType and propertyName
 			var bpOwnerType = xamlElement.GetType();
 			var attached = GetRealNameAndType(ref bpOwnerType, propertyName.NamespaceURI, ref localName, rootElement, lineInfo);
-			var property = GetBindableProperty(bpOwnerType, localName, lineInfo, false);
+			var property = GetBindableProperty(bpOwnerType, localName, lineInfo);
 
 			//If it's a BindableProberty, GetValue
 			if (xpe == null && TryGetValue(xamlElement, property, attached, out var value, lineInfo, out xpe, out targetProperty))
@@ -473,19 +460,50 @@ namespace Microsoft.Maui.Controls.Xaml
 				return false;
 
 			var elementType = element.GetType();
-			var eventInfo = elementType.GetRuntimeEvent(localName);
+			var eventInfo = elementType.GetRuntimeEvent(localName) ?? elementType.GetRuntimeEvents().FirstOrDefault(ei => ei.Name == localName && !(ei.AddMethod.IsPrivate));
 			var stringValue = value as string;
 
 			if (eventInfo == null || IsNullOrEmpty(stringValue))
 				return false;
 
-			foreach (var mi in rootElement.GetType().GetRuntimeMethods())
+			var addMethod = eventInfo.GetAddMethod(nonPublic: true);
+			if (addMethod == null)
+				return false;
+
+			var rootElementType = rootElement.GetType();
+			do
 			{
-				if (mi.Name == (string)value)
+				MethodInfo mi = null;
+				try
+				{
+					mi = rootElementType.GetMethod((string)value, BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+				}
+				catch (AmbiguousMatchException)
+				{
+					var n_params = eventInfo.EventHandlerType.GetMethod("Invoke").GetParameters().Length;
+					var methodinfos = rootElementType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+						.Where(mi => mi.Name == (string)value && mi.GetParameters().Length == n_params)
+						.ToArray();
+
+					//try to find an event handler with a signature matching the button delegate signature
+					foreach (var methodinfo in methodinfos)
+					{
+						var parameters = methodinfo.GetParameters();
+						for (var i = 0; i < n_params; i++)
+						{
+							if (!parameters[i].ParameterType.IsAssignableFrom(eventInfo.EventHandlerType.GetMethod("Invoke").GetParameters()[i].ParameterType))
+								break;
+						}
+						mi = methodinfo;
+						break;
+					}
+				}
+
+				if (mi != null)
 				{
 					try
 					{
-						eventInfo.AddEventHandler(element, mi.CreateDelegate(eventInfo.EventHandlerType, mi.IsStatic ? null : rootElement));
+						addMethod.Invoke(element, new[] { mi.CreateDelegate(eventInfo.EventHandlerType, mi.IsStatic ? null : rootElement) });
 						return true;
 					}
 					catch (ArgumentException)
@@ -493,7 +511,8 @@ namespace Microsoft.Maui.Controls.Xaml
 						// incorrect method signature
 					}
 				}
-			}
+				rootElementType = rootElementType.BaseType;
+			} while (rootElementType is not null);
 
 			exception = new XamlParseException($"No method {value} with correct signature found on type {rootElement.GetType()}", lineInfo);
 			return false;
@@ -579,17 +598,7 @@ namespace Microsoft.Maui.Controls.Xaml
 					}
 				};
 			else
-				minforetriever = () =>
-				{
-					try
-					{
-						return property.DeclaringType.GetRuntimeProperty(property.PropertyName);
-					}
-					catch (AmbiguousMatchException e)
-					{
-						throw new XamlParseException($"Multiple properties with name '{property.DeclaringType}.{property.PropertyName}' found.", lineInfo, innerException: e);
-					}
-				};
+				minforetriever = () => property.DeclaringType.GetRuntimeProperties().FirstOrDefault(pi => pi.Name == property.PropertyName);
 			var convertedValue = value.ConvertTo(property.ReturnType, minforetriever, serviceProvider, out exception);
 			if (exception != null)
 				return false;
@@ -703,7 +712,7 @@ namespace Microsoft.Maui.Controls.Xaml
 			if (!IsVisibleFrom(getter, rootElement))
 				return false;
 
-			value = getter.Invoke(element, new object[] { });
+			value = getter.Invoke(element, Array.Empty<object>());
 			return true;
 		}
 

@@ -6,12 +6,12 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Maui.Controls.Compatibility;
 using Microsoft.Maui.Controls.Internals;
+using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Graphics;
 using Xunit;
 
 namespace Microsoft.Maui.Controls.Core.UnitTests
 {
-
 	public class RelativeLayoutTests : BaseTestFixture
 	{
 		public RelativeLayoutTests()
@@ -57,24 +57,15 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			}
 		}
 
-
-
-
-
-
-
 		[Fact]
 		public void SimpleLayout()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child,
 								Constraint.Constant(30),
@@ -90,15 +81,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void LayoutIsUpdatedWhenConstraintsChange()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child,
 								Constraint.Constant(30),
@@ -131,15 +119,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		//https://github.com/xamarin/Microsoft.Maui.Controls/issues/2169
 		public void BoundsUpdatedIfConstraintsChangedWhileNotParented()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child, Constraint.Constant(30), Constraint.Constant(20));
 			relativeLayout.Layout(new Rect(0, 0, 100, 100));
@@ -148,22 +133,55 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			relativeLayout.Children.Remove(child);
 			relativeLayout.Children.Add(child, Constraint.Constant(50), Constraint.Constant(40));
 			Assert.Equal(child.Bounds, new Rect(50, 40, 100, 20));
+		}
 
+		[Fact]
+		//https://github.com/dotnet/maui/issues/24897
+		public void RelativeLayoutContentShouldBeAppeared()
+		{
+			const int radius = 20;
 
+			var relativeLayout = new RelativeLayout()
+			{
+				IsPlatformEnabled = true,
+			};
+
+			var label = new Label()
+			{
+				IsPlatformEnabled = true,
+				Text = "Hello, World!",
+				VerticalTextAlignment = TextAlignment.Center,
+			};
+
+			var shape = new RoundRectangle()
+			{
+				CornerRadius = new CornerRadius(radius),
+			};
+
+			var border = new Border()
+			{
+				IsPlatformEnabled = true,
+				StrokeShape = shape,
+				Content = label,
+			};
+
+			
+			relativeLayout.Children.Add(border, Constraint.Constant(20), Constraint.Constant(20), Constraint.RelativeToParent(parent => parent.Height),
+								Constraint.RelativeToParent(parent => parent.Height));
+
+			relativeLayout.Layout(new Rect(0, 0, 300, 300));
+			Assert.Equal(new Rect(20, 20, 300, 300), border.Bounds);
 		}
 
 		[Fact]
 		public void SimpleExpressionLayout()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child,
 								() => 30,
@@ -179,15 +197,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void SimpleBoundsSizing()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child, () => new Rect(30, 20, relativeLayout.Height / 2, relativeLayout.Height / 4));
 
@@ -199,17 +214,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void UnconstrainedSize()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true,
-				WidthRequest = 25,
-				HeightRequest = 50
-			};
+			var child = MockPlatformSizeService.Sub<View>(width: 25, height: 50);
 
 			relativeLayout.Children.Add(child, Constraint.Constant(30), Constraint.Constant(20));
 
@@ -221,15 +231,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ViewRelativeLayout()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								Constraint.Constant(30),
@@ -237,10 +244,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 5),
 								Constraint.RelativeToParent(parent => parent.Height / 10));
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child2,
 								Constraint.RelativeToView(child1, (layout, view) => view.Bounds.Right + 10),
@@ -257,15 +261,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ViewRelativeLayoutWithExpressions()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								() => 30,
@@ -273,10 +274,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								() => relativeLayout.Height / 5,
 								() => relativeLayout.Height / 10);
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child2,
 								() => child1.Bounds.Right + 10,
@@ -293,15 +291,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ViewRelativeToMultipleViews()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								Constraint.Constant(30),
@@ -309,10 +304,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 5),
 								Constraint.RelativeToParent(parent => parent.Height / 10));
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child2,
 								Constraint.Constant(30),
@@ -320,10 +312,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 4),
 								Constraint.RelativeToParent(parent => parent.Height / 5));
 
-			var child3 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child3 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child3,
 								Constraint.RelativeToView(child1, (layout, view) => view.Bounds.Right + 10),
@@ -341,15 +330,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ExpressionRelativeToMultipleViews()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								Constraint.Constant(30),
@@ -357,10 +343,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 5),
 								Constraint.RelativeToParent(parent => parent.Height / 10));
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child2,
 								Constraint.Constant(30),
@@ -368,10 +351,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 4),
 								Constraint.RelativeToParent(parent => parent.Height / 5));
 
-			var child3 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child3 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child3,
 								() => child1.Bounds.Right + 10,
@@ -389,15 +369,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ThreePassLayout()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								Constraint.Constant(30),
@@ -405,10 +382,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 5),
 								Constraint.RelativeToParent(parent => parent.Height / 10));
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child2,
 								Constraint.Constant(30),
@@ -416,10 +390,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToParent(parent => parent.Height / 4),
 								Constraint.RelativeToParent(parent => parent.Height / 5));
 
-			var child3 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child3 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child3,
 								Constraint.RelativeToView(child1, (layout, view) => view.Bounds.Right + 10),
@@ -427,10 +398,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								Constraint.RelativeToView(child1, (layout, view) => view.Width),
 								Constraint.RelativeToView(child2, (layout, view) => view.Height * 2));
 
-			var child4 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child4 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child4,
 								Constraint.RelativeToView(child1, (layout, view) => view.Bounds.Right + 10),
@@ -449,15 +417,12 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ThreePassLayoutWithExpressions()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								x: () => 30,
@@ -465,10 +430,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								width: () => relativeLayout.Height / 5,
 								height: () => relativeLayout.Height / 10);
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child2,
 								x: () => 30,
@@ -476,10 +438,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								width: () => relativeLayout.Height / 4,
 								height: () => relativeLayout.Height / 5);
 
-			var child3 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child3 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child3,
 								x: () => child1.Bounds.Right + 10,
@@ -487,10 +446,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 								width: () => child1.Width,
 								height: () => child2.Height * 2);
 
-			var child4 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child4 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child4,
 								x: () => child1.Bounds.Right + 10,
@@ -509,20 +465,14 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 		[Fact]
 		public void ThrowsWithUnsolvableConstraints()
 		{
-			var relativeLayout = new RelativeLayout
+			var relativeLayout = new Compatibility.RelativeLayout
 			{
 				IsPlatformEnabled = true
 			};
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
-			var child2 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child2 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child1,
 								() => 30,
@@ -547,15 +497,9 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 				IsPlatformEnabled = true
 			};
 
-			var child = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child = MockPlatformSizeService.Sub<View>();
 
-			var child1 = new View
-			{
-				IsPlatformEnabled = true
-			};
+			var child1 = MockPlatformSizeService.Sub<View>();
 
 			relativeLayout.Children.Add(child,
 				Constraint.Constant(30),

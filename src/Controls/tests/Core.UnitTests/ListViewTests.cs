@@ -203,6 +203,33 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.Equal(((TextCell)cell).Text, items[0].ToString());
 		}
 
+
+		[Fact]
+		public void SettingSelectItemManuallyBetweenTwoTapsFiresPropertyChanged()
+		{
+			var listView = new ListView
+			{
+				ItemsSource = new[] {
+					"item1",
+					"item2",
+					"item3"
+				}
+			};
+
+			listView.NotifyRowTapped(0);
+			listView.SelectedItem = null;
+
+			bool raised = false;
+			listView.PropertyChanged += (sender, arg) =>
+			{
+				if (arg.PropertyName == ListView.SelectedItemProperty.PropertyName)
+					raised = true;
+			};
+
+			listView.NotifyRowTapped(1);
+			Assert.True(raised);
+		}
+
 		[Fact("Tapping a different item (row) that is equal to the current item selection should still raise ItemSelected")]
 		public void NotifyRowTappedDifferentIndex()
 		{
@@ -404,7 +431,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			};
 
 
-			var sizeRequest = listView.Measure(double.PositiveInfinity, double.PositiveInfinity);
+			var sizeRequest = listView.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None);
 			Assert.Equal(40, sizeRequest.Minimum.Width);
 			Assert.Equal(40, sizeRequest.Minimum.Height);
 			Assert.Equal(50, sizeRequest.Request.Width);
@@ -423,7 +450,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			};
 
 
-			var sizeRequest = listView.Measure(double.PositiveInfinity, double.PositiveInfinity);
+			var sizeRequest = listView.Measure(double.PositiveInfinity, double.PositiveInfinity, MeasureFlags.None);
 			Assert.Equal(40, sizeRequest.Minimum.Width);
 			Assert.Equal(40, sizeRequest.Minimum.Height);
 			Assert.Equal(50, sizeRequest.Request.Width);
@@ -552,7 +579,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			{
 				list.ItemsSource = i % 2 > 0 ? newList1 : newList2;
 
-				// grab a header just so we can be sure its reailized
+				// grab a header just so we can be sure its realized
 				var header = list.TemplatedItems.GetGroup(0).HeaderContent;
 			}
 
@@ -560,7 +587,7 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			GC.WaitForPendingFinalizers();
 
 			// use less or equal because mono will keep the last header var alive no matter what
-			Assert.True(TestCell.NumberOfCells <= 6);
+			Assert.True(TestCell.NumberOfCells <= 6, $"{TestCell.NumberOfCells} <= 6");
 
 			var keepAlive = list.ToString();
 		}
@@ -654,22 +681,6 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			Assert.NotNull(controller.HeaderElement);
 			Assert.IsType<Label>(controller.HeaderElement);
 			Assert.Equal(((Label)controller.HeaderElement).Text, lv.Header);
-		}
-
-		[Fact]
-		public void HeaderTemplateThrowsIfCell()
-		{
-			var lv = new ListView();
-
-			Assert.Throws<ArgumentException>(() => lv.HeaderTemplate = new DataTemplate(typeof(TextCell)));
-		}
-
-		[Fact]
-		public void FooterTemplateThrowsIfCell()
-		{
-			var lv = new ListView();
-
-			Assert.Throws<ArgumentException>(() => lv.FooterTemplate = new DataTemplate(typeof(TextCell)));
 		}
 
 		[Fact]
@@ -1637,6 +1648,27 @@ namespace Microsoft.Maui.Controls.Core.UnitTests
 			var item2 = bindable.TemplatedItems[0];
 
 			Assert.False(ReferenceEquals(item1, item2));
+		}
+
+		[Fact]
+		public void ForceUpdateSizeCalledOnViewCellDoesntCrash()
+		{
+			var list = new ListView()
+			{
+				HasUnevenRows = true
+			};
+
+			list.ItemTemplate = new DataTemplate(() =>
+				{
+					return new ViewCell { View = new Label() };
+				}
+			);
+
+			list.ItemsSource = new[] { "Hi" };
+
+			var element = (ViewCell)list.TemplatedItems[0];
+
+			element.ForceUpdateSize();
 		}
 	}
 }

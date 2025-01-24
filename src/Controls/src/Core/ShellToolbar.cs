@@ -82,8 +82,6 @@ namespace Microsoft.Maui.Controls
 			if (stack.Count > 1)
 				previousPage = stack[stack.Count - 1];
 
-			ToolbarItems = _toolbarTracker.ToolbarItems;
-
 			UpdateBackbuttonBehavior();
 			bool backButtonVisible = true;
 
@@ -95,31 +93,33 @@ namespace Microsoft.Maui.Controls
 			_drawerToggleVisible = stack.Count <= 1;
 			BackButtonVisible = backButtonVisible && stack.Count > 1;
 			BackButtonEnabled = _backButtonBehavior?.IsEnabled ?? true;
+			ToolbarItems = _toolbarTracker.ToolbarItems;
 
 			UpdateTitle();
 
-			if (_currentPage != null &&
-				_currentPage.IsSet(Shell.NavBarIsVisibleProperty))
+			Func<bool> getDefaultNavBarIsVisible = () =>
 			{
-				IsVisible = Shell.GetNavBarIsVisible(_currentPage);
-			}
-			else
-			{
+				// Shell.GetEffectiveValue doesn't check the Shell itself, so check it here
+				if (_shell.IsSet(Shell.NavBarIsVisibleProperty))
+					return (bool)_shell.GetValue(Shell.NavBarIsVisibleProperty);
+
 				var flyoutBehavior = (_shell as IFlyoutView).FlyoutBehavior;
 #if WINDOWS
-				IsVisible = (!String.IsNullOrEmpty(Title) ||
+				return (!String.IsNullOrEmpty(Title) ||
 					TitleView != null ||
 					_toolbarTracker.ToolbarItems.Count > 0 ||
 					_menuBarTracker.ToolbarItems.Count > 0 ||
 					flyoutBehavior == FlyoutBehavior.Flyout);
 #else
-				IsVisible = (BackButtonVisible ||
+				return (BackButtonVisible ||
 					!String.IsNullOrEmpty(Title) ||
 					TitleView != null ||
 					_toolbarTracker.ToolbarItems.Count > 0 ||
 					flyoutBehavior == FlyoutBehavior.Flyout);
 #endif
-			}
+			};
+
+			IsVisible = _shell.GetEffectiveValue(Shell.NavBarIsVisibleProperty, getDefaultNavBarIsVisible, observer: null);
 
 			if (currentPage != null)
 				DynamicOverflowEnabled = PlatformConfiguration.WindowsSpecific.Page.GetToolbarDynamicOverflowEnabled(currentPage);

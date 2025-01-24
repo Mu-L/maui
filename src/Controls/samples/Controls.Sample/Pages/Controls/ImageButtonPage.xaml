@@ -68,8 +68,13 @@
                     Aspect="AspectFit" 
                     Source="cog.png"
                     BorderColor="Red"
-                    BorderWidth="4"
+                    BorderWidth="{Binding Source={x:Reference BorderWidthSlider}, Path=Value}"
                     BackgroundColor="Green"/>
+                <Slider 
+                    x:Name="BorderWidthSlider" 
+                    Minimum="0"
+                    Maximum="20"
+                    Value ="4" />
                 <Label
                     Text="CornerRadius = 0"
                     Style="{StaticResource Headline}"/>
@@ -86,6 +91,16 @@
                     Source="cog.png"
                     CornerRadius="10"
                     BackgroundColor="Purple"/>
+                <ImageButton  
+                    Aspect="AspectFit" 
+                    Source="cog.png"
+                    BackgroundColor="Purple"
+                    CornerRadius="{Binding Source={x:Reference CornerRadiusSlider}, Path=Value}" />
+                <Slider 
+                    x:Name="CornerRadiusSlider"
+                    Minimum="0"
+                    Maximum="60"
+                    Value="10"/>
                 <Label
                     Text="Custom Size"
                     Style="{StaticResource Headline}"/>
@@ -124,6 +139,77 @@
                         </VisualStateGroup>
                     </VisualStateManager.VisualStateGroups>
                 </ImageButton>
+                <Label       
+                    Text="Padding"
+                    Style="{StaticResource Headline}"/>
+                <ImageButton 
+                    HorizontalOptions="Center" 
+                    Clicked="OnImageButtonClicked"
+                    Aspect="AspectFit" 
+                    Background="Green"
+                    BorderColor="Red"
+                    BorderWidth="10"
+                    Source="cog.png"
+                    Padding="{Binding Source={x:Reference PaddingSlider}, Path=Value}" />
+                <ImageButton 
+                    HorizontalOptions="Center" 
+                    Clicked="OnImageButtonClicked"
+                    Aspect="AspectFit" 
+                    Background="Green"
+                    BorderColor="Red"
+                    BorderWidth="10"
+                    Source="cog.png"
+                    WidthRequest="128"
+                    HeightRequest="128"
+                    Padding="{Binding Source={x:Reference PaddingSlider}, Path=Value}" />
+                <Slider 
+                    x:Name="PaddingSlider"
+                    Minimum="0"
+                    Maximum="60"
+                    Value="10"/>
+                <Label
+                    Text="Animated GIF"
+                    Style="{StaticResource Headline}"/>
+                <ImageButton
+                    x:Name="AnimatedGifImage"
+                    Source="animated_heart.gif" />
+                <Button
+                    Text="Use Online Source"
+                    Clicked="UseOnlineSource_Clicked"/>
+                <Label
+                    Text="Background (Null)"
+                    Style="{StaticResource Headline}"/>
+                <ImageButton 
+                    HorizontalOptions="Center" 
+                    Clicked="OnImageButtonClicked"
+                    Aspect="AspectFit" 
+                    BorderColor="Red"
+                    BorderWidth="10"
+                    Source="cog.png"
+                    Padding="0" />
+                <Label
+                    Text="Background (Gradient)"
+                    Style="{StaticResource Headline}"/>
+                <ImageButton 
+                    x:Name="BackgroundImageButton"
+                    HorizontalOptions="Center" 
+                    Clicked="OnImageButtonClicked"
+                    Aspect="AspectFit" 
+                    BorderColor="Red"
+                    BorderWidth="10"
+                    Source="cog.png"
+                    Padding="0" />
+                <HorizontalStackLayout
+                    HorizontalOptions="Center">
+                    <Button
+                        x:Name="UpdateBackgroundButton"
+                        Text="Update Background"
+                        Clicked="OnUpdateBackgroundButtonClicked"/>
+                    <Button
+                        x:Name="RemoveBackgroundButton"
+                        Text="Remove Background"
+                        Clicked="OnRemoveBackgroundButtonClicked"/>
+                </HorizontalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
     </views:BasePage.Content>

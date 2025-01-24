@@ -3,12 +3,11 @@ using System;
 using System.Collections;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Controls.Internals;
 
 namespace Microsoft.Maui.Controls
 {
 	/// <include file="../../docs/Microsoft.Maui.Controls/BindingBase.xml" path="Type[@FullName='Microsoft.Maui.Controls.BindingBase']/Docs/*" />
-	public abstract class BindingBase
+	public abstract partial class BindingBase
 	{
 		static readonly ConditionalWeakTable<IEnumerable, CollectionSynchronizationContext> SynchronizedCollections = new ConditionalWeakTable<IEnumerable, CollectionSynchronizationContext>();
 
@@ -126,9 +125,11 @@ namespace Microsoft.Maui.Controls
 				throw new InvalidOperationException("Cannot change a binding while it's applied");
 		}
 
-		internal virtual void Apply(bool fromTarget) => IsApplied = true;
+		internal virtual void Apply(bool fromTarget)
+				=> IsApplied = true;
 
-		internal virtual void Apply(object context, BindableObject bindObj, BindableProperty targetProperty, bool fromBindingContextChanged = false) => IsApplied = true;
+		internal virtual void Apply(object context, BindableObject bindObj, BindableProperty targetProperty, bool fromBindingContextChanged, SetterSpecificity specificity)
+			=> IsApplied = true;
 
 		internal abstract BindingBase Clone();
 
@@ -143,7 +144,7 @@ namespace Microsoft.Maui.Controls
 			return value;
 		}
 
-		internal bool TryFormat(string format, object arg0, out string value)
+		internal static bool TryFormat(string format, object arg0, out string value)
 		{
 			try
 			{
@@ -158,7 +159,7 @@ namespace Microsoft.Maui.Controls
 			}
 		}
 
-		internal bool TryFormat(string format, object[] args, out string value)
+		internal static bool TryFormat(string format, object[] args, out string value)
 		{
 			try
 			{

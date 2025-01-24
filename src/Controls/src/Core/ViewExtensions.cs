@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Animations;
 using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Graphics;
@@ -65,6 +66,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="opacity">The opacity to fade to.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> FadeTo(this VisualElement view, double opacity, uint length = 250, Easing? easing = null)
 		{
@@ -82,6 +84,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="bounds">The layout bounds.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> LayoutTo(this VisualElement view, Rect bounds, uint length = 250, Easing? easing = null)
 		{
@@ -109,6 +112,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="drotation">The relative rotation.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> RelRotateTo(this VisualElement view, double drotation, uint length = 250, Easing? easing = null)
 		{
@@ -126,6 +130,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="dscale">The relative scale.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> RelScaleTo(this VisualElement view, double dscale, uint length = 250, Easing? easing = null)
 		{
@@ -143,6 +148,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="rotation">The final rotation value.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> RotateTo(this VisualElement view, double rotation, uint length = 250, Easing? easing = null)
 		{
@@ -160,6 +166,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="rotation">The final rotation value.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> RotateXTo(this VisualElement view, double rotation, uint length = 250, Easing? easing = null)
 		{
@@ -177,6 +184,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="rotation">The final rotation value.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> RotateYTo(this VisualElement view, double rotation, uint length = 250, Easing? easing = null)
 		{
@@ -193,6 +201,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="scale">The final absolute scale.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> ScaleTo(this VisualElement view, double scale, uint length = 250, Easing? easing = null)
 		{
@@ -210,6 +219,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="scale">The final absolute scale.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> ScaleXTo(this VisualElement view, double scale, uint length = 250, Easing? easing = null)
 		{
@@ -227,6 +237,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="scale">The final absolute scale.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> ScaleYTo(this VisualElement view, double scale, uint length = 250, Easing? easing = null)
 		{
@@ -245,6 +256,7 @@ namespace Microsoft.Maui.Controls
 		/// <param name="y">The y component of the final translation vector.</param>
 		/// <param name="length">The time, in milliseconds, over which to animate the transition. The default is 250.</param>
 		/// <param name="easing">The easing function to use for the animation.</param>
+		/// <returns>A <see cref="Task"/> containing a <see cref="bool"/> value which indicates whether the animation was canceled. <see langword="true"/> indicates that the animation was canceled. <see langword="false"/> indicates that the animation ran to completion.</returns>
 		/// <exception cref="ArgumentNullException">Thrown when <paramref name="view"/> is <see langword="null"/>.</exception>
 		public static Task<bool> TranslateTo(this VisualElement view, double x, double y, uint length = 250, Easing? easing = null)
 		{
@@ -305,6 +317,9 @@ namespace Microsoft.Maui.Controls
 
 			return fallbackToAppMauiContext ? Application.Current?.FindMauiContext() : default;
 		}
+
+		internal static ILogger<T>? CreateLogger<T>(this Element element, bool fallbackToAppMauiContext = true) =>
+			element.FindMauiContext(fallbackToAppMauiContext)?.CreateLogger<T>();
 
 		internal static IFontManager RequireFontManager(this Element element, bool fallbackToAppMauiContext = false)
 			=> element.RequireMauiContext(fallbackToAppMauiContext).Services.GetRequiredService<IFontManager>();
@@ -452,35 +467,32 @@ namespace Microsoft.Maui.Controls
 
 			// if there is no handler, we need to still run some code
 			var focusRequest = new FocusRequest();
-			MapFocus(view, null, focusRequest);
+			view.MapFocus(focusRequest);
 			return focusRequest.Result;
 		}
 
-		static internal void MapFocus(this IView view, IViewHandler? handler, FocusRequest focusRequest)
+		static internal void MapFocus(this VisualElement view, FocusRequest focusRequest, Action? baseMethod = null)
 		{
-			if (view is VisualElement ve)
+			// the virtual view is already focused
+			if (view.IsFocused)
 			{
-				// the virtual view is already focused
-				if (ve.IsFocused)
-				{
-					focusRequest.TrySetResult(true);
-					return;
-				}
+				focusRequest.TrySetResult(true);
+				return;
+			}
 
-				// if there are legacy events, then use that
-				if (ve.HasFocusChangeRequestedEvent)
-				{
-					var arg = new VisualElement.FocusRequestArgs { Focus = true };
-					ve.InvokeFocusChangeRequested(arg);
-					focusRequest.TrySetResult(arg.Result);
-					return;
-				}
+			// if there are legacy events, then use that
+			if (view.HasFocusChangeRequestedEvent)
+			{
+				var arg = new VisualElement.FocusRequestArgs { Focus = true };
+				view.InvokeFocusChangeRequested(arg);
+				focusRequest.TrySetResult(arg.Result);
+				return;
 			}
 
 			// otherwise, fall back to "base"
-			if (handler is not null)
+			if (baseMethod is not null)
 			{
-				ViewHandler.MapFocus(handler, view, focusRequest);
+				baseMethod.Invoke();
 				return;
 			}
 
@@ -506,6 +518,21 @@ namespace Microsoft.Maui.Controls
 			}
 
 			return window.Handler?.MauiContext;
+		}
+
+		/// <summary>
+		/// Layout updates can be forced by app code rather than relying on the built-in layout system behavior. However, that is not generally recommended. 
+		/// Calling InvalidateArrange, InvalidateMeasure or UpdateLayout is usually unnecessary and can cause poor performance if overused. 
+		/// In many situations where app code might be changing layout properties, the layout system will probably already be processing updates asynchronously. 
+		/// The layout system also has optimizations for dealing with cascades of layout changes through parent-child relationships, 
+		/// and forcing layout with app code can work against such optimizations. Nevertheless, 
+		/// it's possible that layout situations exist in more complicated scenarios where forcing layout is the best option for resolving a timing issue or other issue with layout. 
+		/// Just use it deliberately and sparingly.
+		/// </summary>
+		/// <param name="view">The view on which this method operates.</param>
+		public static void InvalidateMeasure(this VisualElement view)
+		{
+			(view as IView)?.InvalidateMeasure();
 		}
 	}
 }

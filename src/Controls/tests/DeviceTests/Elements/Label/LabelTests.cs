@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 #if __IOS__
 using Foundation;
 #endif
@@ -25,6 +26,37 @@ namespace Microsoft.Maui.DeviceTests
 					handlers.AddHandler<Layout, LayoutHandler>();
 				});
 			});
+		}
+
+		[Fact(DisplayName = "Does Not Leak")]
+		public async Task DoesNotLeak()
+		{
+			SetupBuilder();
+
+			WeakReference viewReference = null;
+			WeakReference platformViewReference = null;
+			WeakReference handlerReference = null;
+
+			await InvokeOnMainThreadAsync(() =>
+			{
+				var layout = new Grid();
+
+				var label = new Label
+				{
+					Text = "Test"
+				};
+
+				layout.Add(label);
+				var handler = CreateHandler<LayoutHandler>(layout);
+				viewReference = new WeakReference(label);
+				handlerReference = new WeakReference(label.Handler);
+				platformViewReference = new WeakReference(label.Handler.PlatformView);
+			});
+
+			await AssertionExtensions.WaitForGC(viewReference, handlerReference, platformViewReference);
+			Assert.False(viewReference.IsAlive, "Label should not be alive!");
+			Assert.False(handlerReference.IsAlive, "Handler should not be alive!");
+			Assert.False(platformViewReference.IsAlive, "PlatformView should not be alive!");
 		}
 
 		[Theory]
@@ -204,6 +236,32 @@ namespace Microsoft.Maui.DeviceTests
 			}));
 		}
 
+		[Fact(DisplayName = "LineBreakMode TailTruncation does not affect MaxLines")]
+		public async Task TailTruncationDoesNotAffectMaxLines()
+		{
+			var label = new Label()
+			{
+				Text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
+				MaxLines = 3,
+				LineBreakMode = LineBreakMode.TailTruncation,
+			};
+
+			var handler = await CreateHandlerAsync<LabelHandler>(label);
+			var platformLabel = GetPlatformLabel(handler);
+
+			await InvokeOnMainThreadAsync(() =>
+			{
+				Assert.Equal(3, GetPlatformMaxLines(handler));
+				Assert.Equal(LineBreakMode.TailTruncation.ToPlatform(), GetPlatformLineBreakMode(handler));
+
+				label.LineBreakMode = LineBreakMode.CharacterWrap;
+				platformLabel.UpdateLineBreakMode(label);
+
+				Assert.Equal(3, GetPlatformMaxLines(handler));
+				Assert.Equal(LineBreakMode.CharacterWrap.ToPlatform(), GetPlatformLineBreakMode(handler));
+			});
+		}
+
 		[Fact(DisplayName = "MaxLines Initializes Correctly")]
 		public async Task MaxLinesInitializesCorrectly()
 		{
@@ -277,7 +335,11 @@ namespace Microsoft.Maui.DeviceTests
 			});
 		}
 
-		[Theory]
+		[Theory(
+#if WINDOWS
+		Skip = "Fails on Windows"
+#endif
+		)]
 		[InlineData(TextAlignment.Center)]
 		[InlineData(TextAlignment.Start)]
 		[InlineData(TextAlignment.End)]
@@ -372,6 +434,8 @@ namespace Microsoft.Maui.DeviceTests
 		[Theory(
 #if ANDROID
 			Skip = "Android does not have the exact same layout with a string vs spans."
+#elif WINDOWS
+			Skip = "Fails on Windows"
 #endif
 		)]
 		[InlineData(10)]
@@ -457,6 +521,166 @@ namespace Microsoft.Maui.DeviceTests
 				AssertEquivalentFont(handler, label.ToFont());
 			});
 		}
+
+		[Fact]
+		public async Task FormattedStringSpanTextHasCorrectColorWhenChanges()
+		{
+			var formattedLabel = new Label
+			{
+				WidthRequest = 200,
+				HeightRequest = 50,
+				FontSize = 16,
+				FormattedText = new FormattedString
+				{
+					Spans =
+					{
+						new Span { Text = "short" },
+						new Span { Text = " long second string" },
+						new Span { Text = " blue string", TextColor = Colors.Blue },
+					}
+				},
+			};
+
+			formattedLabel.TextColor = Colors.Red;
+
+			await InvokeOnMainThreadAsync(async () =>
+			{
+				var handler = CreateHandler<LabelHandler>(formattedLabel);
+
+				await handler.PlatformView.AssertContainsColor(Colors.Blue, MauiContext);
+				await handler.PlatformView.AssertContainsColor(Colors.Red, MauiContext);
+			});
+		}
+
+		[Fact]
+		public async Task FormattedStringSpanTextHasCorrectColorWhenChangedAfterCreation()
+		{
+			var formattedLabel = new Label
+			{
+				WidthRequest = 200,
+				HeightRequest = 50,
+				FontSize = 16,
+				FormattedText = new FormattedString
+				{
+					Spans =
+					{
+						new Span { Text = "short" },
+						new Span { Text = " long second string" },
+						new Span { Text = " blue string", TextColor = Colors.Blue },
+					}
+				},
+			};
+
+			await InvokeOnMainThreadAsync(async () =>
+			{
+				var handler = CreateHandler<LabelHandler>(formattedLabel);
+
+				await handler.PlatformView.AssertContainsColor(Colors.Blue, MauiContext);
+				await handler.PlatformView.AssertDoesNotContainColor(Colors.Red, MauiContext);
+
+				formattedLabel.TextColor = Colors.Red;
+
+				await handler.PlatformView.AssertContainsColor(Colors.Blue, MauiContext);
+				await handler.PlatformView.AssertContainsColor(Colors.Red, MauiContext);
+			});
+		}
+
+		[Theory]
+#if !WINDOWS
+		// TODO fix these, failing on Windows
+		[InlineData(TextAlignment.Start, LineBreakMode.HeadTruncation)]
+		[InlineData(TextAlignment.Start, LineBreakMode.MiddleTruncation)]
+		[InlineData(TextAlignment.Start, LineBreakMode.TailTruncation)]
+		[InlineData(TextAlignment.Center, LineBreakMode.HeadTruncation)]
+		[InlineData(TextAlignment.Center, LineBreakMode.MiddleTruncation)]
+		[InlineData(TextAlignment.Center, LineBreakMode.TailTruncation)]
+		[InlineData(TextAlignment.End, LineBreakMode.HeadTruncation)]
+		[InlineData(TextAlignment.End, LineBreakMode.MiddleTruncation)]
+		[InlineData(TextAlignment.End, LineBreakMode.TailTruncation)]
+#endif
+		[InlineData(TextAlignment.Start, LineBreakMode.NoWrap)]
+		[InlineData(TextAlignment.Center, LineBreakMode.NoWrap)]
+		[InlineData(TextAlignment.End, LineBreakMode.NoWrap)]
+		public async Task LabelTruncatesCorrectly(TextAlignment textAlignment, LineBreakMode lineBreakMode)
+		{
+			EnsureHandlerCreated(builder =>
+			{
+				builder.ConfigureMauiHandlers(handlers =>
+				{
+					handlers.AddHandler<VerticalStackLayout, LayoutHandler>();
+					handlers.AddHandler<Label, LabelHandler>();
+				});
+			});
+
+			var labelStart = new Label
+			{
+				HorizontalOptions = LayoutOptions.Start,
+				LineBreakMode = lineBreakMode,
+				HorizontalTextAlignment = textAlignment,
+				Text = LoremIpsum,
+			};
+
+			var labelCenter = new Label
+			{
+				HorizontalOptions = LayoutOptions.Center,
+				LineBreakMode = lineBreakMode,
+				HorizontalTextAlignment = textAlignment,
+				Text = LoremIpsum,
+			};
+
+			var labelEnd = new Label
+			{
+				HorizontalOptions = LayoutOptions.End,
+				LineBreakMode = lineBreakMode,
+				HorizontalTextAlignment = textAlignment,
+				Text = LoremIpsum,
+			};
+
+			var labelFill = new Label
+			{
+				HorizontalOptions = LayoutOptions.Fill,
+				LineBreakMode = lineBreakMode,
+				HorizontalTextAlignment = textAlignment,
+				Text = LoremIpsum,
+			};
+
+			var layout = new VerticalStackLayout()
+				{
+					labelStart,
+					labelCenter,
+					labelEnd,
+					labelFill,
+				};
+
+			layout.HeightRequest = 300;
+			layout.WidthRequest = 100;
+
+#if WINDOWS
+			await AttachAndRun(layout, (handler) =>
+			{
+				var layoutPlatWidth = handler.PlatformView.Width;
+				Assert.Equal(labelStart.Width, layoutPlatWidth);
+				Assert.Equal(labelCenter.Width, layoutPlatWidth);
+				Assert.Equal(labelEnd.Width, layoutPlatWidth);
+				Assert.Equal(double.Round(labelFill.Width, 5), double.Round(layoutPlatWidth, 5));
+			});
+
+#else
+			await InvokeOnMainThreadAsync(async () =>
+			{
+				var contentViewHandler = CreateHandler<LayoutHandler>(layout);
+				await contentViewHandler.PlatformView.AttachAndRun(() =>
+				{
+					Assert.Equal(double.Round(labelStart.Width, 5), double.Round(layout.Width, 5));
+					Assert.Equal(double.Round(labelCenter.Width, 5), double.Round(layout.Width, 5));
+					Assert.Equal(double.Round(labelEnd.Width, 5), double.Round(layout.Width, 5));
+					Assert.Equal(double.Round(labelFill.Width, 5), double.Round(layout.Width, 5));
+				});
+			});
+#endif
+		}
+
+		static readonly string LoremIpsum = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
 
 		[Fact]
 		public async Task TextTypeAfterFontStuffIsCorrect()

@@ -268,6 +268,10 @@ namespace Microsoft.Maui.ApplicationModel
 		{
 		}
 
+		public partial class NearbyWifiDevices : BasePlatformPermission
+		{
+		}
+
 		public partial class NetworkState : BasePlatformPermission
 		{
 		}
@@ -281,6 +285,10 @@ namespace Microsoft.Maui.ApplicationModel
 		}
 
 		public partial class PhotosAddOnly : BasePlatformPermission
+		{
+		}
+
+		public partial class PostNotifications : BasePlatformPermission
 		{
 		}
 

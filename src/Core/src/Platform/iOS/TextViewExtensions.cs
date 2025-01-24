@@ -53,6 +53,14 @@ namespace Microsoft.Maui.Platform
 				textView.AutocorrectionType = UITextAutocorrectionType.No;
 		}
 
+		public static void UpdateIsSpellCheckEnabled(this UITextView textView, IEditor editor)
+		{
+			if (editor.IsSpellCheckEnabled)
+				textView.SpellCheckingType = UITextSpellCheckingType.Yes;
+			else
+				textView.SpellCheckingType = UITextSpellCheckingType.No;
+		}
+
 		public static void UpdateFont(this UITextView textView, ITextStyle textStyle, IFontManager fontManager)
 		{
 			var font = textStyle.Font;
@@ -62,12 +70,24 @@ namespace Microsoft.Maui.Platform
 
 		public static void UpdateIsReadOnly(this UITextView textView, IEditor editor)
 		{
-			textView.UserInteractionEnabled = !(editor.IsReadOnly || editor.InputTransparent);
+			textView.UpdateEditable(editor);
 		}
 
 		public static void UpdateIsEnabled(this UITextView textView, IEditor editor)
 		{
-			textView.Editable = editor.IsEnabled;
+			textView.UpdateEditable(editor);
+		}
+
+		internal static void UpdateEditable(this UITextView textView, IEditor editor)
+		{
+			var isEditable = editor.IsEnabled && !editor.IsReadOnly;
+
+			textView.Editable = isEditable;
+
+			// If the input accessory view is set, we need to hide it when the editor is read-only
+			// otherwise it will appear when the editor recieves focus.
+			if (textView.InputAccessoryView is { } view)
+				view.Hidden = !isEditable;
 		}
 
 		public static void UpdateKeyboard(this UITextView textView, IEditor editor)
@@ -77,7 +97,10 @@ namespace Microsoft.Maui.Platform
 			textView.ApplyKeyboard(keyboard);
 
 			if (keyboard is not CustomKeyboard)
+			{
 				textView.UpdateIsTextPredictionEnabled(editor);
+				textView.UpdateIsSpellCheckEnabled(editor);
+			}
 
 			textView.ReloadInputViews();
 		}

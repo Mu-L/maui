@@ -2,6 +2,7 @@
 using Android.Graphics.Drawables;
 using Android.Text;
 using Android.Views;
+using Android.Views.InputMethods;
 using AndroidX.AppCompat.Widget;
 using AndroidX.Core.Content;
 using static Android.Views.View;
@@ -41,6 +42,7 @@ namespace Microsoft.Maui.Handlers
 		// TODO: NET8 issoto - Change the return type to MauiAppCompatEditText
 		protected override void ConnectHandler(AppCompatEditText platformView)
 		{
+			platformView.ViewAttachedToWindow += OnViewAttachedToWindow;
 			platformView.TextChanged += OnTextChanged;
 			platformView.FocusChange += OnFocusedChange;
 			platformView.Touch += OnTouch;
@@ -51,7 +53,7 @@ namespace Microsoft.Maui.Handlers
 		protected override void DisconnectHandler(AppCompatEditText platformView)
 		{
 			_clearButtonDrawable = null;
-
+			platformView.ViewAttachedToWindow -= OnViewAttachedToWindow;
 			platformView.TextChanged -= OnTextChanged;
 			platformView.FocusChange -= OnFocusedChange;
 			platformView.Touch -= OnTouch;
@@ -64,6 +66,14 @@ namespace Microsoft.Maui.Handlers
 			_set = false;
 		}
 
+		void OnViewAttachedToWindow(object? sender, ViewAttachedToWindowEventArgs e)
+		{
+			if (PlatformView is null || VirtualView is null)
+				return;
+
+			PlatformView.UpdateReturnType(VirtualView);
+		}
+
 		public static void MapBackground(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateBackground(entry);
 
@@ -73,8 +83,12 @@ namespace Microsoft.Maui.Handlers
 		public static void MapTextColor(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateTextColor(entry);
 
-		public static void MapIsPassword(IEntryHandler handler, IEntry entry) =>
+		public static void MapIsPassword(IEntryHandler handler, IEntry entry)
+		{
+			handler.UpdateValue(nameof(IEntry.Text));
+
 			handler.PlatformView?.UpdateIsPassword(entry);
+		}
 
 		public static void MapHorizontalTextAlignment(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateHorizontalTextAlignment(entry);
@@ -84,6 +98,9 @@ namespace Microsoft.Maui.Handlers
 
 		public static void MapIsTextPredictionEnabled(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateIsTextPredictionEnabled(entry);
+
+		public static void MapIsSpellCheckEnabled(IEntryHandler handler, IEntry entry) =>
+			handler.PlatformView?.UpdateIsSpellCheckEnabled(entry);
 
 		public static void MapMaxLength(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateMaxLength(entry);
@@ -100,11 +117,19 @@ namespace Microsoft.Maui.Handlers
 		public static void MapFont(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateFont(entry, handler.GetRequiredService<IFontManager>());
 
-		public static void MapIsReadOnly(IEntryHandler handler, IEntry entry) =>
-			handler.PlatformView?.UpdateIsReadOnly(entry);
+		public static void MapIsReadOnly(IEntryHandler handler, IEntry entry)
+		{
+			handler.UpdateValue(nameof(IEntry.Text));
 
-		public static void MapKeyboard(IEntryHandler handler, IEntry entry) =>
+			handler.PlatformView?.UpdateIsReadOnly(entry);
+		}
+
+		public static void MapKeyboard(IEntryHandler handler, IEntry entry)
+		{
+			handler.UpdateValue(nameof(IEntry.Text));
+
 			handler.PlatformView?.UpdateKeyboard(entry);
+		}
 
 		public static void MapReturnType(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateReturnType(entry);
@@ -139,6 +164,7 @@ namespace Microsoft.Maui.Handlers
 
 			// Let the mapping know that the update is coming from changes to the platform control
 			DataFlowDirection = DataFlowDirection.FromPlatform;
+
 			VirtualView.UpdateText(e);
 
 			// Reset to the default direction
@@ -167,17 +193,40 @@ namespace Microsoft.Maui.Handlers
 		{
 			var returnType = VirtualView?.ReturnType;
 
+			// Inside of the android implementations that map events to listeners, the default return value for "Handled" is always true
+			// This means, just by subscribing to EditorAction/KeyPressed/etc.. you change the behavior of the control
+			// So, we are setting handled to false here in order to maintain default behavior
+			bool handled = false;
 			if (returnType != null)
 			{
-				var currentInputImeFlag = returnType.Value.ToPlatform();
+				var actionId = e.ActionId;
+				var evt = e.Event;
+				ImeAction currentInputImeFlag = PlatformView.ImeOptions;
 
-				if (e.IsCompletedAction(currentInputImeFlag))
+				// On API 34 it looks like they fixed the issue where the actionId is ImeAction.ImeNull when using a keyboard
+				// so I'm just setting the actionId here to the current ImeOptions so the logic can all be simplified
+				if (actionId == ImeAction.ImeNull && evt?.KeyCode == Keycode.Enter)
+				{
+					actionId = currentInputImeFlag;
+				}
+
+				// keyboard path
+				if (evt?.KeyCode == Keycode.Enter && evt?.Action == KeyEventActions.Down)
+				{
+					handled = true;
+				}
+				else if (evt?.KeyCode == Keycode.Enter && evt?.Action == KeyEventActions.Up)
+				{
+					VirtualView?.Completed();
+				}
+				// InputPaneView Path
+				else if (evt?.KeyCode is null && (actionId == ImeAction.Done || actionId == currentInputImeFlag))
 				{
 					VirtualView?.Completed();
 				}
 			}
 
-			e.Handled = false;
+			e.Handled = handled;
 		}
 
 		private void OnSelectionChanged(object? sender, EventArgs e)

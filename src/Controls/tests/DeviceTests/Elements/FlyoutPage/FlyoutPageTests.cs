@@ -13,7 +13,7 @@ using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui.Platform;
 using Xunit;
-
+using static Microsoft.Maui.DeviceTests.AssertHelpers;
 
 #if IOS || MACCATALYST
 using FlyoutViewHandler = Microsoft.Maui.Controls.Handlers.Compatibility.PhoneFlyoutPageRenderer;
@@ -40,7 +40,7 @@ namespace Microsoft.Maui.DeviceTests
 					handlers.AddHandler(typeof(NavigationPage), typeof(NavigationViewHandler));
 #endif
 					handlers.AddHandler<Page, PageHandler>();
-					handlers.AddHandler<Frame, FrameRenderer>();
+					handlers.AddHandler<Border, BorderHandler>();
 					handlers.AddHandler<Controls.Window, WindowHandlerStub>();
 				});
 			});
@@ -57,7 +57,7 @@ namespace Microsoft.Maui.DeviceTests
 			{
 				var flyoutPage = CreateFlyoutPage(
 					flyoutPageType,
-					new NavigationPage(new ContentPage() { Content = new Frame(), Title = "Detail" }),
+					new NavigationPage(new ContentPage() { Content = new Border(), Title = "Detail" }),
 					new ContentPage() { Title = "Flyout" });
 
 				await navPage.PushAsync(flyoutPage);
@@ -65,7 +65,6 @@ namespace Microsoft.Maui.DeviceTests
 			});
 		}
 
-#if !IOS && !MACCATALYST
 		[Theory]
 		[ClassData(typeof(FlyoutPageLayoutBehaviorTestCases))]
 		public async Task SwappingDetailPageWorksForSplitFlyoutBehavior(Type flyoutPageType)
@@ -74,7 +73,7 @@ namespace Microsoft.Maui.DeviceTests
 
 			var flyoutPage = CreateFlyoutPage(
 					flyoutPageType,
-					new NavigationPage(new ContentPage() { Content = new Frame(), Title = "Detail" }),
+					new NavigationPage(new ContentPage() { Content = new Border(), Title = "Detail" }),
 					new ContentPage() { Title = "Flyout" });
 
 			await CreateHandlerAndAddToWindow<WindowHandlerStub>(new Window(flyoutPage), async (handler) =>
@@ -136,7 +135,11 @@ namespace Microsoft.Maui.DeviceTests
 			});
 		}
 
-		[Theory(DisplayName = "Details View Updates")]
+		[Theory(DisplayName = "Details View Updates"
+#if MACCATALYST
+			, Skip = "Fails on Mac Catalyst, fixme"
+#endif
+		)]
 		[ClassData(typeof(FlyoutPageLayoutBehaviorTestCases))]
 		public async Task DetailsViewUpdates(Type flyoutPageType)
 		{
@@ -164,7 +167,6 @@ namespace Microsoft.Maui.DeviceTests
 				Assert.Null(FindPlatformFlyoutView(detailView));
 			});
 		}
-#endif
 
 		FlyoutPage CreateFlyoutPage(Type type, Page detail, Page flyout)
 		{
@@ -172,6 +174,103 @@ namespace Microsoft.Maui.DeviceTests
 			flyoutPage.Detail = detail;
 			flyoutPage.Flyout = flyout;
 			return flyoutPage;
+		}
+
+		[Theory]
+		[InlineData(false
+#if MACCATALYST
+			, Skip = "Fails on Mac Catalyst, fixme"
+#endif
+			)]
+		[InlineData(true)]
+		public async Task DetailsPageMeasuresCorrectlyInSplitMode(bool isRtl)
+		{
+			SetupBuilder();
+			var flyoutLabel = new Label() { Text = "Content" };
+			var flyoutPage = await InvokeOnMainThreadAsync(() => new FlyoutPage()
+			{
+				FlyoutLayoutBehavior = FlyoutLayoutBehavior.Split,
+				Detail = new ContentPage()
+				{
+					Title = "Detail",
+					Content = new Label()
+				},
+				Flyout = new ContentPage()
+				{
+					Title = "Flyout",
+					Content = flyoutLabel
+				},
+				FlowDirection = (isRtl) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight
+			});
+
+			await CreateHandlerAndAddToWindow<FlyoutViewHandler>(flyoutPage, async (handler) =>
+			{
+				if (!CanDeviceDoSplitMode(flyoutPage))
+					return;
+
+				await AssertEventually(() => flyoutPage.Flyout.GetBoundingBox().Width > 0);
+
+				var detailBounds = flyoutPage.Detail.GetBoundingBox();
+				var flyoutBounds = flyoutPage.Flyout.GetBoundingBox();
+				var windowBounds = flyoutPage.GetBoundingBox();
+
+				Assert.True(detailBounds.Height <= windowBounds.Height, $"Details is measuring too high. Details - {detailBounds} Window - {windowBounds}");
+				Assert.True(flyoutBounds.Height <= windowBounds.Height, $"Flyout is measuring too high Flyout - {flyoutBounds} Window - {windowBounds}");
+				Assert.True(flyoutBounds.Width + detailBounds.Width <= windowBounds.Width,
+					$"Flyout and Details width exceed the width of the window. Details - {detailBounds}  Flyout - {flyoutBounds} Window - {windowBounds}");
+
+				Assert.True(detailBounds.X + detailBounds.Width <= windowBounds.Width,
+					$"Right edge of Details View is off the screen. Details - {detailBounds} Window - {windowBounds}");
+
+				if (isRtl)
+				{
+					Assert.Equal(flyoutBounds.X, detailBounds.Width);
+				}
+				else
+				{
+					Assert.Equal(flyoutBounds.Width, detailBounds.X);
+				}
+
+				Assert.Equal(detailBounds.Width, windowBounds.Width - flyoutBounds.Width);
+			});
+		}
+
+		[Fact(DisplayName = "Back Button Enabled Changes with push/pop + page change")]
+		public async Task BackButtonEnabledChangesWithPushPopAndPageChanges()
+		{
+			SetupBuilder();
+
+			var flyoutPage = await InvokeOnMainThreadAsync(() => new FlyoutPage
+			{
+				FlyoutLayoutBehavior = FlyoutLayoutBehavior.Split,
+				Flyout = new ContentPage() { Title = "Hello world" }
+			});
+
+			var first = new NavigationPage(new ContentPage());
+			var second = new NavigationPage(new ContentPage());
+
+			flyoutPage.Detail = first;
+
+			await CreateHandlerAndAddToWindow<FlyoutViewHandler>(flyoutPage, async (handler) =>
+			{
+				Assert.False(IsBackButtonVisible(handler));
+
+				await first.PushAsync(new ContentPage());
+				await AssertEventually(() => IsBackButtonVisible(handler));
+				Assert.True(IsBackButtonVisible(handler));
+
+				flyoutPage.Detail = second;
+				Assert.False(IsBackButtonVisible(handler));
+
+				await second.PushAsync(new ContentPage());
+				await AssertEventually(() => IsBackButtonVisible(handler));
+				Assert.True(IsBackButtonVisible(handler));
+			});
+		}
+
+		bool CanDeviceDoSplitMode(FlyoutPage page)
+		{
+			return ((IFlyoutPageController)page).ShouldShowSplitMode;
 		}
 	}
 }

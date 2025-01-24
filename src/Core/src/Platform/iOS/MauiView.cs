@@ -1,18 +1,22 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using CoreGraphics;
+using Microsoft.Maui.Graphics;
 using ObjCRuntime;
 using UIKit;
 
 namespace Microsoft.Maui.Platform
 {
-	public abstract class MauiView : UIView
+	public abstract class MauiView : UIView, ICrossPlatformLayoutBacking, IVisualTreeElementProvidable, IUIViewLifeCycleEvents
 	{
+		bool _fireSetNeedsLayoutOnParentWhenWindowAttached;
 		static bool? _respondsToSafeArea;
 
 		double _lastMeasureHeight = double.NaN;
 		double _lastMeasureWidth = double.NaN;
 
 		WeakReference<IView>? _reference;
+		WeakReference<ICrossPlatformLayout>? _crossPlatformLayoutReference;
 
 		public IView? View
 		{
@@ -29,6 +33,11 @@ namespace Microsoft.Maui.Platform
 
 		protected CGRect AdjustForSafeArea(CGRect bounds)
 		{
+			if (KeyboardAutoManagerScroll.ShouldIgnoreSafeAreaAdjustment)
+			{
+				KeyboardAutoManagerScroll.ShouldScrollAgain = true;
+			}
+
 			if (View is not ISafeAreaView sav || sav.IgnoreSafeArea || !RespondsToSafeArea())
 			{
 				return bounds;
@@ -56,6 +65,139 @@ namespace Microsoft.Maui.Platform
 		{
 			_lastMeasureWidth = widthConstraint;
 			_lastMeasureHeight = heightConstraint;
+		}
+
+		public override void SafeAreaInsetsDidChange()
+		{
+			base.SafeAreaInsetsDidChange();
+
+			if (View is ISafeAreaView2 isav2)
+				isav2.SafeAreaInsets = this.SafeAreaInsets.ToThickness();
+		}
+
+		public ICrossPlatformLayout? CrossPlatformLayout
+		{
+			get => _crossPlatformLayoutReference != null && _crossPlatformLayoutReference.TryGetTarget(out var v) ? v : null;
+			set => _crossPlatformLayoutReference = value == null ? null : new WeakReference<ICrossPlatformLayout>(value);
+		}
+
+		Size CrossPlatformMeasure(double widthConstraint, double heightConstraint)
+		{
+			return CrossPlatformLayout?.CrossPlatformMeasure(widthConstraint, heightConstraint) ?? Size.Zero;
+		}
+
+		Size CrossPlatformArrange(Rect bounds)
+		{
+			return CrossPlatformLayout?.CrossPlatformArrange(bounds) ?? Size.Zero;
+		}
+
+		public override CGSize SizeThatFits(CGSize size)
+		{
+			if (_crossPlatformLayoutReference == null)
+			{
+				return base.SizeThatFits(size);
+			}
+
+			var widthConstraint = size.Width;
+			var heightConstraint = size.Height;
+
+			var crossPlatformSize = CrossPlatformMeasure(widthConstraint, heightConstraint);
+
+			CacheMeasureConstraints(widthConstraint, heightConstraint);
+
+			return crossPlatformSize.ToCGSize();
+		}
+
+		// TODO: Possibly reconcile this code with ViewHandlerExtensions.LayoutVirtualView
+		// If you make changes here please review if those changes should also
+		// apply to ViewHandlerExtensions.LayoutVirtualView
+		public override void LayoutSubviews()
+		{
+			base.LayoutSubviews();
+
+			if (_crossPlatformLayoutReference == null)
+			{
+				return;
+			}
+
+			var bounds = AdjustForSafeArea(Bounds).ToRectangle();
+
+			var widthConstraint = bounds.Width;
+			var heightConstraint = bounds.Height;
+
+			// If the SuperView is a cross-platform layout backed view (i.e. MauiView, MauiScrollView, LayoutView, ..),
+			// then measurement has already happened via SizeThatFits and doesn't need to be repeated in LayoutSubviews.
+			// This is especially important to avoid overriding potentially infinite measurement constraints
+			// imposed by the parent (i.e. scroll view) with the current bounds.
+			// But we _do_ need LayoutSubviews to make a measurement pass if the parent is something else (for example,
+			// the window); there's no guarantee that SizeThatFits has been called in that case.
+			if (!IsMeasureValid(widthConstraint, heightConstraint) && !this.IsFinalMeasureHandledBySuperView())
+			{
+				CrossPlatformMeasure(widthConstraint, heightConstraint);
+				CacheMeasureConstraints(widthConstraint, heightConstraint);
+			}
+
+			CrossPlatformArrange(bounds);
+		}
+
+		public override void SetNeedsLayout()
+		{
+			InvalidateConstraintsCache();
+			base.SetNeedsLayout();
+			TryToInvalidateSuperView(false);
+		}
+
+		private protected void TryToInvalidateSuperView(bool shouldOnlyInvalidateIfPending)
+		{
+			if (shouldOnlyInvalidateIfPending && !_fireSetNeedsLayoutOnParentWhenWindowAttached)
+			{
+				return;
+			}
+
+			// We check for Window to avoid scenarios where an invalidate might propagate up the tree
+			// To a SuperView that's been disposed which will cause a crash when trying to access it
+			if (Window is not null)
+			{
+				this.Superview?.SetNeedsLayout();
+				_fireSetNeedsLayoutOnParentWhenWindowAttached = false;
+			}
+			else
+			{
+				_fireSetNeedsLayoutOnParentWhenWindowAttached = true;
+			}
+		}
+
+		IVisualTreeElement? IVisualTreeElementProvidable.GetElement()
+		{
+
+			if (View is IVisualTreeElement viewElement &&
+				viewElement.IsThisMyPlatformView(this))
+			{
+				return viewElement;
+			}
+
+			if (CrossPlatformLayout is IVisualTreeElement layoutElement &&
+				layoutElement.IsThisMyPlatformView(this))
+			{
+				return layoutElement;
+			}
+
+			return null;
+		}
+
+		[UnconditionalSuppressMessage("Memory", "MEM0002", Justification = IUIViewLifeCycleEvents.UnconditionalSuppressMessage)]
+		EventHandler? _movedToWindow;
+		event EventHandler? IUIViewLifeCycleEvents.MovedToWindow
+		{
+			add => _movedToWindow += value;
+			remove => _movedToWindow -= value;
+		}
+
+		public override void MovedToWindow()
+		{
+			base.MovedToWindow();
+			_movedToWindow?.Invoke(this, EventArgs.Empty);
+			TryToInvalidateSuperView(true);
 		}
 	}
 }

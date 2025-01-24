@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using CoreGraphics;
 using Microsoft.Maui.Graphics;
@@ -9,13 +10,16 @@ using WebKit;
 
 namespace Microsoft.Maui.Platform
 {
-	public class MauiRefreshView : UIView
+	public class MauiRefreshView : MauiView
 	{
 		bool _isRefreshing;
 		nfloat _originalY;
 		nfloat _refreshControlHeight;
+		[UnconditionalSuppressMessage("Memory", "MEM0002", Justification = "Proven safe in test: MemoryTests.HandlerDoesNotLeak")]
 		UIView _refreshControlParent;
+		[UnconditionalSuppressMessage("Memory", "MEM0002", Justification = "Proven safe in test: MemoryTests.HandlerDoesNotLeak")]
 		UIView? _contentView;
+		[UnconditionalSuppressMessage("Memory", "MEM0002", Justification = "Proven safe in test: MemoryTests.HandlerDoesNotLeak")]
 		UIRefreshControl _refreshControl;
 		public UIRefreshControl RefreshControl => _refreshControl;
 
@@ -50,12 +54,14 @@ namespace Microsoft.Maui.Platform
 
 		public void UpdateContent(IView? content, IMauiContext? mauiContext)
 		{
-			if (_refreshControlParent != null)
+			if (_refreshControlParent is not null)
+			{
 				TryRemoveRefresh(_refreshControlParent);
+			}
 
 			_contentView?.RemoveFromSuperview();
 
-			if (content != null && mauiContext != null)
+			if (content is not null && mauiContext is not null)
 			{
 				_contentView = content.ToPlatform(mauiContext);
 				AddSubview(_contentView);
@@ -160,17 +166,6 @@ namespace Microsoft.Maui.Platform
 			}
 
 			return false;
-		}
-
-		public override CGRect Bounds
-		{
-			get => base.Bounds;
-			set
-			{
-				base.Bounds = value;
-				if (_contentView != null)
-					_contentView.Frame = value;
-			}
 		}
 
 		public void UpdateIsEnabled(bool isRefreshViewEnabled)

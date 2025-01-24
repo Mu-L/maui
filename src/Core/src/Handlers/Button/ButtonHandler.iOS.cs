@@ -12,6 +12,10 @@ namespace Microsoft.Maui.Handlers
 		// This appears to be the padding that Xcode has when "Default" content insets are used
 		public readonly static Thickness DefaultPadding = new Thickness(12, 7);
 
+		// Because we can't inherit from Button we use the container to handle
+		// Life cycle events and things like monitoring focus changed
+		public override bool NeedsContainer => true;
+
 		protected override UIButton CreatePlatformView()
 		{
 			var button = new UIButton(UIButtonType.System);
@@ -20,6 +24,15 @@ namespace Microsoft.Maui.Handlers
 		}
 
 		readonly ButtonEventProxy _proxy = new ButtonEventProxy();
+
+		protected override void SetupContainer()
+		{
+			base.SetupContainer();
+			if (ContainerView is WrapperView wrapperView)
+			{
+				wrapperView.CrossPlatformLayout = VirtualView as ICrossPlatformLayout;
+			}
+		}
 
 		protected override void ConnectHandler(UIButton platformView)
 		{
@@ -129,28 +142,11 @@ namespace Microsoft.Maui.Handlers
 			handler.PlatformView?.UpdateCharacterSpacing(button);
 		}
 
-		void OnSetImageSource(UIImage? image)
-		{
-			if (image != null)
-			{
-				PlatformView.SetImage(image.ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal), UIControlState.Normal);
-			}
-			else
-			{
-				PlatformView.SetImage(null, UIControlState.Normal);
-			}
-		}
-
 		public static void MapImageSource(IButtonHandler handler, IImage image) =>
 			MapImageSourceAsync(handler, image).FireAndForget(handler);
 
 		public static Task MapImageSourceAsync(IButtonHandler handler, IImage image)
 		{
-			if (image.Source == null)
-			{
-				return Task.CompletedTask;
-			}
-
 			return handler.ImageSourceLoader.UpdateImageSourceAsync();
 		}
 
@@ -177,6 +173,7 @@ namespace Microsoft.Maui.Handlers
 				platformView.TouchUpInside += OnButtonTouchUpInside;
 				platformView.TouchUpOutside += OnButtonTouchUpOutside;
 				platformView.TouchDown += OnButtonTouchDown;
+				platformView.TouchCancel += OnButtonTouchCancel;
 			}
 
 			public void Disconnect(UIButton platformView)
@@ -186,15 +183,18 @@ namespace Microsoft.Maui.Handlers
 				platformView.TouchUpInside -= OnButtonTouchUpInside;
 				platformView.TouchUpOutside -= OnButtonTouchUpOutside;
 				platformView.TouchDown -= OnButtonTouchDown;
+				platformView.TouchCancel -= OnButtonTouchCancel;
+			}
+
+			void OnButtonTouchCancel(object? sender, EventArgs e)
+			{
+				VirtualView?.Released();
 			}
 
 			void OnButtonTouchUpInside(object? sender, EventArgs e)
 			{
-				if (VirtualView is IButton virtualView)
-				{
-					virtualView.Released();
-					virtualView.Clicked();
-				}
+				VirtualView?.Released();
+				VirtualView?.Clicked();
 			}
 
 			void OnButtonTouchUpOutside(object? sender, EventArgs e)
@@ -205,6 +205,19 @@ namespace Microsoft.Maui.Handlers
 			void OnButtonTouchDown(object? sender, EventArgs e)
 			{
 				VirtualView?.Pressed();
+			}
+		}
+
+		partial class ButtonImageSourcePartSetter
+		{
+			public override void SetImageSource(UIImage? platformImage)
+			{
+				if (Handler?.PlatformView is not UIButton button)
+					return;
+
+				platformImage = platformImage?.ImageWithRenderingMode(UIImageRenderingMode.AlwaysOriginal);
+
+				button.SetImage(platformImage, UIControlState.Normal);
 			}
 		}
 	}

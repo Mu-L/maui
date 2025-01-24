@@ -41,11 +41,13 @@ namespace Microsoft.Maui.Handlers
 		public static void MapStrokeThickness(IImageButtonHandler handler, IButtonStroke buttonStroke)
 		{
 			handler.PlatformView.UpdateStrokeThickness(buttonStroke);
+			handler.UpdateValue(nameof(IImageButton.Padding));
 		}
 
 		public static void MapCornerRadius(IImageButtonHandler handler, IButtonStroke buttonStroke)
 		{
 			handler.PlatformView.UpdateCornerRadius(buttonStroke);
+			handler.UpdateValue(nameof(IImageButton.Padding));
 		}
 
 		[MissingMapper]
@@ -66,12 +68,18 @@ namespace Microsoft.Maui.Handlers
 			VirtualView?.Clicked();
 		}
 
-		void OnSetImageSource(MauiImageSource? img)
+		partial class ImageButtonImageSourcePartSetter
 		{
-			if (img == null)
-				return;
+			public override void SetImageSource(MauiImageSource? platformImage)
+			{
+				if (Handler?.PlatformView is not MauiImageButton button)
+					return;
 
-			PlatformView.ResourceUrl = img.ResourceUrl;
+				if (platformImage is null)
+					return;
+
+				button.ResourceUrl = platformImage.ResourceUrl;
+			}
 		}
 	}
 }

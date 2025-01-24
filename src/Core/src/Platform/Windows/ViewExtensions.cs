@@ -36,7 +36,9 @@ namespace Microsoft.Maui.Platform
 		public static void Unfocus(this FrameworkElement platformView, IView view)
 		{
 			if (platformView is Control control)
+			{
 				UnfocusControl(control);
+			}
 		}
 
 		public static void UpdateVisibility(this FrameworkElement platformView, IView view)
@@ -83,6 +85,7 @@ namespace Microsoft.Maui.Platform
 			}
 		}
 
+		[Obsolete("IBorder is not used and will be removed in a future release.")]
 		public static void UpdateBorder(this FrameworkElement platformView, IView view)
 		{
 			var border = (view as IBorder)?.Border;
@@ -92,8 +95,12 @@ namespace Microsoft.Maui.Platform
 
 		public static void UpdateOpacity(this FrameworkElement platformView, IView view)
 		{
-			platformView.Opacity = view.Visibility == Visibility.Hidden ? 0 : view.Opacity;
+			var opacity = view.Visibility == Visibility.Hidden ? 0 : view.Opacity;
+
+			platformView.UpdateOpacity(opacity);
 		}
+
+		internal static void UpdateOpacity(this FrameworkElement platformView, double opacity) => platformView.Opacity = (float)opacity;
 
 		public static void UpdateBackground(this ContentPanel platformView, IBorderStroke border)
 		{
@@ -191,9 +198,13 @@ namespace Microsoft.Maui.Platform
 
 			if (Dimension.IsMinimumSet(minHeight))
 			{
-				// We only use the minimum value if it's been explicitly set; otherwise, leave it alone
-				// because the platform/theme may have a minimum height for this control
+				// We only use the minimum value if it's been explicitly set; otherwise, clear the local
+				// value so that the platform/theme can use the default minimum height for this control
 				platformView.MinHeight = minHeight;
+			}
+			else
+			{
+				platformView.ClearValue(FrameworkElement.MinHeightProperty);
 			}
 		}
 
@@ -203,9 +214,13 @@ namespace Microsoft.Maui.Platform
 
 			if (Dimension.IsMinimumSet(minWidth))
 			{
-				// We only use the minimum value if it's been explicitly set; otherwise, leave it alone
-				// because the platform/theme may have a minimum width for this control
+				// We only use the minimum value if it's been explicitly set; otherwise, clear the local
+				// value so that the platform/theme can use the default minimum width for this control
 				platformView.MinWidth = minWidth;
+			}
+			else
+			{
+				platformView.ClearValue(FrameworkElement.MinWidthProperty);
 			}
 		}
 
@@ -257,10 +272,12 @@ namespace Microsoft.Maui.Platform
 			ToolTipService.SetToolTip(platformView, tooltip?.Content);
 		}
 
+		/// <summary>
+		/// Background and InputTransparent for Windows layouts are heavily intertwined, so setting one
+		/// usually requires setting the other at the same time.
+		/// </summary>
 		internal static void UpdatePlatformViewBackground(this LayoutPanel layoutPanel, ILayout layout)
 		{
-			// Background and InputTransparent for Windows layouts are heavily intertwined, so setting one
-			// usuall requires setting the other at the same time
 			layoutPanel.UpdateInputTransparent(layout.InputTransparent, layout?.Background?.ToPlatform());
 		}
 
@@ -354,10 +371,20 @@ namespace Microsoft.Maui.Platform
 			return null;
 		}
 
+		internal static T? GetChildAt<T>(this DependencyObject view, int index) where T : DependencyObject
+		{
+			if (VisualTreeHelper.GetChildrenCount(view) >= index)
+				return null;
+
+			return VisualTreeHelper.GetChild(view, index) as T;
+		}
+
 		internal static void UnfocusControl(Control control)
 		{
-			if (control == null || !control.IsEnabled)
+			if (!control.IsEnabled)
+			{
 				return;
+			}
 
 			var isTabStop = control.IsTabStop;
 			control.IsTabStop = false;

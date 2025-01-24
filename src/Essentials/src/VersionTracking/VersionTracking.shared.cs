@@ -238,7 +238,7 @@ namespace Microsoft.Maui.ApplicationModel
 			IsFirstLaunchEver = !preferences.ContainsKey(versionsKey, sharedName) || !preferences.ContainsKey(buildsKey, sharedName);
 			if (IsFirstLaunchEver)
 			{
-				versionTrail = new Dictionary<string, List<string>>
+				versionTrail = new(StringComparer.Ordinal)
 				{
 					{ versionsKey, new List<string>() },
 					{ buildsKey, new List<string>() }
@@ -246,7 +246,7 @@ namespace Microsoft.Maui.ApplicationModel
 			}
 			else
 			{
-				versionTrail = new Dictionary<string, List<string>>
+				versionTrail = new(StringComparer.Ordinal)
 				{
 					{ versionsKey, ReadHistory(versionsKey).ToList() },
 					{ buildsKey, ReadHistory(buildsKey).ToList() }
@@ -326,7 +326,7 @@ namespace Microsoft.Maui.ApplicationModel
 		}
 
 		string[] ReadHistory(string key)
-			=> preferences.Get<string?>(key, null, sharedName)?.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries) ?? new string[0];
+			=> preferences.Get<string?>(key, null, sharedName)?.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
 
 		void WriteHistory(string key, IEnumerable<string> history)
 			=> preferences.Set(key, string.Join("|", history), sharedName);

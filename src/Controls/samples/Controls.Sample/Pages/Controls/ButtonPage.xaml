@@ -82,6 +82,16 @@
                     </Button.Background>
                 </Button>
                 <Label
+                    Text="Changing SolidColorBrush to LinearGradientBrush"
+                    Style="{StaticResource Headline}"/>
+                <Button 
+                    x:Name="ChangeBrushButton"
+                    Text="Background"
+                    CornerRadius="12"
+                    BorderColor="Yellow"
+                    BorderWidth="4"
+                    Clicked="OnChangeBrushButtonClicked"/>
+                <Label
                     Text="TextColor"
                     Style="{StaticResource Headline}"/>
                 <Button
@@ -128,11 +138,27 @@
                     CharacterSpacing="20"
                     Text="Button"/>
                 <Label
+                    Text="Character Spacing with Text Color"
+                    Style="{StaticResource Headline}"/>
+                <Button
+                    CharacterSpacing="20"
+                    TextColor="HotPink"
+                    Text="Button"/>
+                <Label
+                    Text="Actual Image"
+                    Style="{StaticResource Headline}"/>
+                <Grid>
+                    <Image
+                        Background="Black" Source="settings.png" 
+                        HorizontalOptions="Center" VerticalOptions="Center" />
+                </Grid>
+                <Label
                     Text="Image Source"
                     Style="{StaticResource Headline}"/>
-                <Button 
+                <Button
+                    x:Name="ImageSourceButton"
                     ContentLayout="Top" TextColor="White" Background="Black" 
-                    ImageSource="settings.png" />
+                    ImageSource="settings.png" Clicked="Button_Clicked" />
                 <Label
                     Text="Image Source with Positioning"
                     Style="{StaticResource Headline}"/>
@@ -149,7 +175,7 @@
                     ContentLayout="Right" TextColor="White" Background="Black" 
                     ImageSource="settings.png" Text="settings" />
                 <Label
-                    Text="Click To Change Positionng"
+                    Text="Click To Change Positioning"
                     Style="{StaticResource Headline}"/>
                 <Button 
                     x:Name="positionChange" ContentLayout="Top" TextColor="White" Background="Black" 
@@ -219,6 +245,20 @@
                 <Button
                     Text="End"
                     HorizontalOptions="End" />
+                 <Label
+                    Text="Slide to change the Border Width:"
+                    Style="{StaticResource Headline}"/>
+                <Button
+                    Text="BorderWidth Changing"
+                    ImageSource="settings.png"
+                    HorizontalOptions="Center"
+                    BackgroundColor="Green"
+                    BorderWidth="{Binding Source={x:Reference BorderWidthSlider}, Path=Value}" />
+                <Slider
+                    x:Name="BorderWidthSlider"
+                    Minimum="0"
+                    Maximum="100"
+                    Value ="0"/>
             </VerticalStackLayout>
         </ScrollView>
     </views:BasePage.Content>

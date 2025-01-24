@@ -18,16 +18,12 @@ namespace Microsoft.Maui.Handlers
 			return platformView;
 		}
 
-		void OnSetImageSource(Drawable? obj)
-		{
-			PlatformView.SetImageDrawable(obj);
-		}
-
 		protected override void DisconnectHandler(ShapeableImageView platformView)
 		{
 			platformView.FocusChange -= OnFocusChange;
 			platformView.Click -= OnClick;
 			platformView.Touch -= OnTouch;
+			platformView.ViewAttachedToWindow -= OnPlatformViewAttachedToWindow;
 
 			base.DisconnectHandler(platformView);
 
@@ -39,34 +35,36 @@ namespace Microsoft.Maui.Handlers
 			platformView.FocusChange += OnFocusChange;
 			platformView.Click += OnClick;
 			platformView.Touch += OnTouch;
+			platformView.ViewAttachedToWindow += OnPlatformViewAttachedToWindow;
 
 			base.ConnectHandler(platformView);
 		}
 
-		// TODO: NET8 make this public
-		internal static void MapBackground(IImageButtonHandler handler, IImageButton imageButton)
+		public static void MapBackground(IImageButtonHandler handler, IImageButton imageButton)
 		{
-			(handler.PlatformView as ShapeableImageView)?.UpdateBackground(imageButton);
+			handler.PlatformView?.UpdateBackground(imageButton);
 		}
 
 		public static void MapStrokeColor(IImageButtonHandler handler, IButtonStroke buttonStroke)
 		{
-			(handler.PlatformView as ShapeableImageView)?.UpdateStrokeColor(buttonStroke);
+			handler.PlatformView?.UpdateStrokeColor(buttonStroke);
 		}
 
 		public static void MapStrokeThickness(IImageButtonHandler handler, IButtonStroke buttonStroke)
 		{
-			(handler.PlatformView as ShapeableImageView)?.UpdateStrokeThickness(buttonStroke);
+			handler.PlatformView?.UpdateStrokeThickness(buttonStroke);
+			handler.UpdateValue(nameof(IImageButton.Padding));
 		}
 
 		public static void MapCornerRadius(IImageButtonHandler handler, IButtonStroke buttonStroke)
 		{
-			(handler.PlatformView as ShapeableImageView)?.UpdateCornerRadius(buttonStroke);
+			handler.PlatformView?.UpdateCornerRadius(buttonStroke);
+			handler.UpdateValue(nameof(IImageButton.Padding));
 		}
 
 		public static void MapPadding(IImageButtonHandler handler, IImageButton imageButton)
 		{
-			(handler.PlatformView as ShapeableImageView)?.UpdatePadding(imageButton);
+			handler.PlatformView?.UpdatePadding(imageButton);
 		}
 
 		void OnFocusChange(object? sender, View.FocusChangeEventArgs e)
@@ -94,6 +92,33 @@ namespace Microsoft.Maui.Handlers
 		void OnClick(object? sender, EventArgs e)
 		{
 			VirtualView?.Clicked();
+		}
+
+		void OnPlatformViewAttachedToWindow(object? sender, View.ViewAttachedToWindowEventArgs e)
+		{
+			if (sender is not View platformView)
+			{
+				return;
+			}
+
+			if (!this.IsConnected())
+			{
+				platformView.ViewAttachedToWindow -= OnPlatformViewAttachedToWindow;
+				return;
+			}
+
+			ImageHandler.OnPlatformViewAttachedToWindow(this);
+		}
+
+		partial class ImageButtonImageSourcePartSetter
+		{
+			public override void SetImageSource(Drawable? platformImage)
+			{
+				if (Handler?.PlatformView is not ShapeableImageView button)
+					return;
+
+				button.SetImageDrawable(platformImage);
+			}
 		}
 	}
 }

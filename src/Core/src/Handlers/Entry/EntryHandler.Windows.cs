@@ -70,6 +70,9 @@ namespace Microsoft.Maui.Handlers
 		public static void MapIsTextPredictionEnabled(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateIsTextPredictionEnabled(entry);
 
+		public static void MapIsSpellCheckEnabled(IEntryHandler handler, IEntry entry) =>
+			handler.PlatformView?.UpdateIsSpellCheckEnabled(entry);
+
 		public static void MapMaxLength(IEntryHandler handler, IEntry entry) =>
 			handler.PlatformView?.UpdateMaxLength(entry);
 
@@ -119,10 +122,6 @@ namespace Microsoft.Maui.Handlers
 			if (VirtualView?.ReturnType == ReturnType.Next)
 			{
 				PlatformView?.TryMoveFocus(FocusNavigationDirection.Next);
-			}
-			else
-			{
-				// TODO: Hide the soft keyboard; this matches the behavior of .NET MAUI on Android/iOS
 			}
 
 			VirtualView?.Completed();

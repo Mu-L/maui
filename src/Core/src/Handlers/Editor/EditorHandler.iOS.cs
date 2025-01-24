@@ -9,7 +9,7 @@ namespace Microsoft.Maui.Handlers
 {
 	public partial class EditorHandler : ViewHandler<IEditor, MauiTextView>
 	{
-		bool _set;
+		readonly MauiTextViewEventProxy _proxy = new();
 
 		protected override MauiTextView CreatePlatformView()
 		{
@@ -40,31 +40,34 @@ namespace Microsoft.Maui.Handlers
 		{
 			base.SetVirtualView(view);
 
-			if (!_set)
-				PlatformView.SelectionChanged += OnSelectionChanged;
-
-			_set = true;
+			_proxy.SetVirtualView(PlatformView);
 		}
 
 		protected override void ConnectHandler(MauiTextView platformView)
 		{
-			platformView.ShouldChangeText += OnShouldChangeText;
-			platformView.Started += OnStarted;
-			platformView.Ended += OnEnded;
-			platformView.TextSetOrChanged += OnTextPropertySet;
+			_proxy.Connect(VirtualView, platformView);
 		}
 
 		protected override void DisconnectHandler(MauiTextView platformView)
 		{
-			platformView.ShouldChangeText -= OnShouldChangeText;
-			platformView.Started -= OnStarted;
-			platformView.Ended -= OnEnded;
-			platformView.TextSetOrChanged -= OnTextPropertySet;
+			_proxy.Disconnect(platformView);
+		}
 
-			if (_set)
-				platformView.SelectionChanged -= OnSelectionChanged;
+		public override bool NeedsContainer
+		{
+			get
+			{
+				// The layout of the Editor behaves differently on iOS 16 and earlier versions when the size or scale changes at runtime.
+				// https://github.com/dotnet/maui/issues/25581 - The content height gradually increases when scaling down the Editor, indicating improper handling of sizing.
+				// It appears that iOS 17.0 manages this correctly.
+				// To ensure consistent behavior that matches iOS 17.0, we wrap the Editor in a container on iOS 16 and earlier versions.
+				if (!OperatingSystem.IsIOSVersionAtLeast(17) && !OperatingSystem.IsMacCatalyst())
+				{
+					return true;
+				}
 
-			_set = false;
+				return base.NeedsContainer;
+			}
 		}
 
 		public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
@@ -75,16 +78,16 @@ namespace Microsoft.Maui.Handlers
 				// get an exception; it doesn't know what do to with it. So instead we'll size
 				// it to fit its current contents and use those values to replace infinite constraints
 
-				PlatformView.SizeToFit();
+				var sizeThatFits = PlatformView.SizeThatFits(new CGSize(widthConstraint, heightConstraint));
 
 				if (double.IsInfinity(widthConstraint))
 				{
-					widthConstraint = PlatformView.Frame.Size.Width;
+					widthConstraint = sizeThatFits.Width;
 				}
 
 				if (double.IsInfinity(heightConstraint))
 				{
-					heightConstraint = PlatformView.Frame.Size.Height;
+					heightConstraint = sizeThatFits.Height;
 				}
 			}
 
@@ -102,8 +105,11 @@ namespace Microsoft.Maui.Handlers
 		public static void MapTextColor(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateTextColor(editor);
 
-		public static void MapPlaceholder(IEditorHandler handler, IEditor editor) =>
+		public static void MapPlaceholder(IEditorHandler handler, IEditor editor)
+		{
 			handler.PlatformView?.UpdatePlaceholder(editor);
+			handler.UpdateValue(nameof(IEditor.CharacterSpacing));
+		}
 
 		public static void MapPlaceholderColor(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdatePlaceholderColor(editor);
@@ -119,6 +125,9 @@ namespace Microsoft.Maui.Handlers
 
 		public static void MapIsTextPredictionEnabled(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateIsTextPredictionEnabled(editor);
+
+		public static void MapIsSpellCheckEnabled(IEditorHandler handler, IEditor editor) =>
+			handler.PlatformView?.UpdateIsSpellCheckEnabled(editor);
 
 		public static void MapFont(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateFont(editor, handler.GetRequiredService<IFontManager>());
@@ -149,38 +158,84 @@ namespace Microsoft.Maui.Handlers
 		public static void MapIsEnabled(IEditorHandler handler, IEditor editor) =>
 			handler.PlatformView?.UpdateIsEnabled(editor);
 
-		bool OnShouldChangeText(UITextView textView, NSRange range, string replacementString) =>
-			VirtualView.TextWithinMaxLength(textView.Text, range, replacementString);
-
-		void OnStarted(object? sender, EventArgs eventArgs)
+		class MauiTextViewEventProxy
 		{
-			if (VirtualView != null)
-				VirtualView.IsFocused = true;
-		}
+			bool _set;
+			WeakReference<IEditor>? _virtualView;
 
-		void OnEnded(object? sender, EventArgs eventArgs)
-		{
-			if (VirtualView != null)
+			IEditor? VirtualView => _virtualView is not null && _virtualView.TryGetTarget(out var v) ? v : null;
+
+			public void Connect(IEditor virtualView, MauiTextView platformView)
 			{
-				VirtualView.IsFocused = false;
+				_virtualView = new(virtualView);
 
-				VirtualView.Completed();
+				platformView.ShouldChangeText += OnShouldChangeText;
+				platformView.Started += OnStarted;
+				platformView.Ended += OnEnded;
+				platformView.TextSetOrChanged += OnTextPropertySet;
 			}
-		}
 
-		void OnTextPropertySet(object? sender, EventArgs e) =>
-			VirtualView.UpdateText(PlatformView.Text);
+			public void Disconnect(MauiTextView platformView)
+			{
+				_virtualView = null;
 
-		private void OnSelectionChanged(object? sender, EventArgs e)
-		{
-			var cursorPosition = PlatformView.GetCursorPosition();
-			var selectedTextLength = PlatformView.GetSelectedTextLength();
+				platformView.ShouldChangeText -= OnShouldChangeText;
+				platformView.Started -= OnStarted;
+				platformView.Ended -= OnEnded;
+				platformView.TextSetOrChanged -= OnTextPropertySet;
+				if (_set)
+					platformView.SelectionChanged -= OnSelectionChanged;
 
-			if (VirtualView.CursorPosition != cursorPosition)
-				VirtualView.CursorPosition = cursorPosition;
+				_set = false;
+			}
 
-			if (VirtualView.SelectionLength != selectedTextLength)
-				VirtualView.SelectionLength = selectedTextLength;
+			public void SetVirtualView(MauiTextView platformView)
+			{
+				if (!_set)
+					platformView.SelectionChanged += OnSelectionChanged;
+				_set = true;
+			}
+
+			void OnSelectionChanged(object? sender, EventArgs e)
+			{
+				if (sender is MauiTextView platformView && VirtualView is IEditor virtualView)
+				{
+					var cursorPosition = platformView.GetCursorPosition();
+					var selectedTextLength = platformView.GetSelectedTextLength();
+
+					if (virtualView.CursorPosition != cursorPosition)
+						virtualView.CursorPosition = cursorPosition;
+
+					if (virtualView.SelectionLength != selectedTextLength)
+						virtualView.SelectionLength = selectedTextLength;
+				}
+			}
+
+			bool OnShouldChangeText(UITextView textView, NSRange range, string replacementString) =>
+				VirtualView?.TextWithinMaxLength(textView.Text, range, replacementString) ?? false;
+
+			void OnStarted(object? sender, EventArgs eventArgs)
+			{
+				if (VirtualView is IEditor virtualView)
+					virtualView.IsFocused = true;
+			}
+
+			void OnEnded(object? sender, EventArgs eventArgs)
+			{
+				if (VirtualView is IEditor virtualView)
+				{
+					virtualView.IsFocused = false;
+					virtualView.Completed();
+				}
+			}
+
+			void OnTextPropertySet(object? sender, EventArgs e)
+			{
+				if (sender is MauiTextView platformView)
+				{
+					VirtualView?.UpdateText(platformView.Text);
+				}
+			}
 		}
 	}
 }

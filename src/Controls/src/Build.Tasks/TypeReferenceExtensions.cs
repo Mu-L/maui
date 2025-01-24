@@ -9,12 +9,12 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 {
 	class TypeRefComparer : IEqualityComparer<TypeReference>
 	{
-		static string GetAssembly(TypeReference typeRef)
+		static string GetAssemblyName(TypeReference typeRef)
 		{
 			if (typeRef.Scope is ModuleDefinition md)
-				return md.Assembly.FullName;
+				return md.Assembly.Name.Name;
 			if (typeRef.Scope is AssemblyNameReference anr)
-				return anr.FullName;
+				return anr.Name;
 			throw new ArgumentOutOfRangeException(nameof(typeRef));
 		}
 
@@ -30,8 +30,8 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 			var yname = y.FullName.EndsWith("&", StringComparison.InvariantCulture) ? y.FullName.Substring(0, y.FullName.Length - 1) : y.FullName;
 			if (xname != yname)
 				return false;
-			var xasm = GetAssembly(x);
-			var yasm = GetAssembly(y);
+			var xasm = GetAssemblyName(x);
+			var yasm = GetAssemblyName(y);
 
 			//standard types comes from either mscorlib. System.Runtime or netstandard. Assume they are equivalent
 			if ((xasm.StartsWith("System.Runtime", StringComparison.Ordinal)
@@ -50,7 +50,7 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 
 		public int GetHashCode(TypeReference obj)
 		{
-			return $"{GetAssembly(obj)}//{obj.FullName}".GetHashCode();
+			return $"{GetAssemblyName(obj)}//{obj.FullName}".GetHashCode();
 		}
 
 		static TypeRefComparer s_default;
@@ -235,9 +235,6 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 				}
 			}
 
-			if (typeRef.IsValueType)
-				return false;
-
 			if (typeRef.FullName == "System.Object")
 				return false;
 			var typeDef = typeRef.ResolveCached(cache);
@@ -414,8 +411,9 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 			List<TypeReference> args = new List<TypeReference>();
 			for (var i = 0; i < self.GenericArguments.Count; i++)
 			{
-				var genericParameter = self.GenericArguments[i] as GenericParameter;
-				if (genericParameter == null)
+				if (self.GenericArguments[i] is ArrayType arrayType && arrayType.ElementType is GenericParameter arrayGenericParameter)
+					args.Add(declaringTypeReference.GenericArguments[arrayGenericParameter.Position].MakeArrayType());
+				else if (self.GenericArguments[i] is not GenericParameter genericParameter)
 					args.Add(self.GenericArguments[i].ResolveGenericParameters(declaringTypeReference));
 				else if (genericParameter.Type == GenericParameterType.Type)
 					args.Add(declaringTypeReference.GenericArguments[genericParameter.Position]);
@@ -424,5 +422,6 @@ namespace Microsoft.Maui.Controls.Build.Tasks
 		}
 
 		public static TypeDefinition ResolveCached(this TypeReference typeReference, XamlCache cache) => cache.Resolve(typeReference);
+
 	}
 }

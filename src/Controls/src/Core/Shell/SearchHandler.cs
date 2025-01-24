@@ -56,7 +56,7 @@ namespace Microsoft.Maui.Controls
 		[EditorBrowsable(EditorBrowsableState.Never)]
 		public void SetIsFocused(bool value)
 		{
-			SetValueCore(IsFocusedPropertyKey, value);
+			SetValue(IsFocusedPropertyKey, value, specificity: SetterSpecificity.FromHandler);
 		}
 		[EditorBrowsable(EditorBrowsableState.Never)]
 		public event EventHandler<FocusRequestArgs> FocusChangeRequested;
@@ -297,7 +297,7 @@ namespace Microsoft.Maui.Controls
 		void ISearchHandlerController.ItemSelected(object obj)
 		{
 			OnItemSelected(obj);
-			SetValueCore(SelectedItemPropertyKey, obj);
+			SetValue(SelectedItemPropertyKey, obj, specificity: SetterSpecificity.FromHandler);
 		}
 
 		void ISearchHandlerController.QueryConfirmed()
@@ -361,9 +361,11 @@ namespace Microsoft.Maui.Controls
 			BindableProperty.Create(nameof(Command), typeof(ICommand), typeof(SearchHandler), null, BindingMode.OneTime,
 				propertyChanged: OnCommandChanged);
 
+#pragma warning disable CS0618
 		/// <summary>Bindable property for <see cref="DisplayMemberName"/>.</summary>
 		public static readonly BindableProperty DisplayMemberNameProperty =
 			BindableProperty.Create(nameof(DisplayMemberName), typeof(string), typeof(SearchHandler), null, BindingMode.OneTime);
+#pragma warning restore CS0618
 
 		/// <summary>Bindable property for <see cref="IsSearchEnabled"/>.</summary>
 		public static readonly BindableProperty IsSearchEnabledProperty =
@@ -498,6 +500,7 @@ namespace Microsoft.Maui.Controls
 		}
 
 		/// <include file="../../../docs/Microsoft.Maui.Controls/SearchHandler.xml" path="//Member[@MemberName='DisplayMemberName']/Docs/*" />
+		[Obsolete("Use ItemTemplate instead.")]
 		public string DisplayMemberName
 		{
 			get { return (string)GetValue(DisplayMemberNameProperty); }
@@ -570,9 +573,9 @@ namespace Microsoft.Maui.Controls
 			set { SetValue(ShowsResultsProperty, value); }
 		}
 
-		bool ClearPlaceholderEnabledCore { set => SetValueCore(ClearPlaceholderEnabledProperty, value); }
+		bool ClearPlaceholderEnabledCore { set => SetValue(ClearPlaceholderEnabledProperty, value); }
 
-		bool IsSearchEnabledCore { set => SetValueCore(IsSearchEnabledProperty, value); }
+		bool IsSearchEnabledCore { set => SetValue(IsSearchEnabledProperty, value); }
 
 		protected virtual void OnClearPlaceholderClicked()
 		{

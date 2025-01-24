@@ -13,6 +13,7 @@ namespace Microsoft.Maui.ApplicationModel
 			public const int WM_SETTINGCHANGE = 0x001A;
 			public const int WM_THEMECHANGE = 0x031A;
 			public const int WM_GETMINMAXINFO = 0x0024;
+			public const int WM_STYLECHANGING = 0x007C;
 		}
 
 		public delegate IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
@@ -97,13 +98,18 @@ namespace Microsoft.Maui.ApplicationModel
 
 		public static Maui.Graphics.Rect GetCaptionButtonsBound(IntPtr hWnd)
 		{
-			DwmGetWindowAttribute(hWnd, DwmWindowAttribute.DWMWA_CAPTION_BUTTON_BOUNDS, out RECT value, Marshal.SizeOf(typeof(RECT)));
+			DwmGetWindowAttribute(hWnd, DwmWindowAttribute.DWMWA_CAPTION_BUTTON_BOUNDS, out RECT value, Marshal.SizeOf<RECT>());
 			var density = GetDpiForWindow(hWnd) / 96f;
 			return new Graphics.Rect(
 				value.Left / density,
 				value.Top / density,
 				value.Right / density,
 				value.Bottom / density);
+		}
+
+		public static bool HasStyle(uint currentStyle, WindowStyles styleMask)
+		{
+			return (currentStyle & (uint)styleMask) == (uint)styleMask;
 		}
 
 		public enum WindowLongFlags : int
@@ -166,6 +172,20 @@ namespace Microsoft.Maui.ApplicationModel
 		}
 
 		[Flags]
+		public enum WindowStyles : uint
+		{
+			WS_BORDER = 0x00800000,
+			WS_CAPTION = 0x00C00000,
+			WS_SYSMENU = 0x00080000,
+			WS_THICKFRAME = 0x00040000,
+			WS_MINIMIZEBOX = 0x00020000,
+			WS_MAXIMIZEBOX = 0x00020000,
+			WS_OVERLAPPED = 0x00000000,
+			WS_CAPTIONANDSYSTEMMENU = WS_CAPTION | WS_SYSMENU,
+			WS_OVERLAPPEDWINDOW = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+		}
+
+		[Flags]
 		public enum ExtendedWindowStyles : uint
 		{
 			WS_EX_RTLREADING = 0x00002000,
@@ -216,6 +236,13 @@ namespace Microsoft.Maui.ApplicationModel
 			public POINT MaxPosition;
 			public POINT MinTrackSize;
 			public POINT MaxTrackSize;
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		public struct STYLESTRUCT
+		{
+			public uint StyleOld;
+			public uint StyleNew;
 		}
 	}
 }
